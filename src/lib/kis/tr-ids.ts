@@ -15,9 +15,14 @@ export const KIS_TR_ID_REAL = {
   orderCashSell: "TTTC0011U",
 } as const;
 
+/**
+ * financialRatio(재무비율)는 TR_ID는 실전과 동일하지만 모의투자 계좌로는
+ * 실제로 데이터가 제공되지 않는다 — 값을 넣어도 호출이 의미 없으므로
+ * 이 객체에서 제외한다. 재무비율이 필요하면 KIS_TR_ID_REAL.financialRatio를
+ * 실전 계좌 키로 호출해야 한다 (issue #9 참고).
+ */
 export const KIS_TR_ID_DEMO = {
   inquirePrice: "FHKST01010100",
-  financialRatio: "FHKST66430300",
   inquireBalance: "VTTC8434R",
   orderCashBuy: "VTTC0012U",
   orderCashSell: "VTTC0011U",
