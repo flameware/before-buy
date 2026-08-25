@@ -5,8 +5,10 @@
 // prototype re-issuing a token per cold start is fine (KIS: 24h validity, 6h reissue
 // interval, no documented rate limit on demo — see tr-ids.ts).
 //
-// Base URL defaults to the 모의투자 (paper trading) domain, not KIS's own 실전 default,
-// so a missing KIS_BASE_URL env var fails safe instead of silently hitting production.
+// Parameterized rather than a singleton reading shared env vars: quote-client.ts and
+// trade-client.ts each construct their own instance from domain-specific credentials
+// (실전 조회 전용 vs 모의 거래), so there is no shared state a trade code path could
+// read real credentials from (issue #13, spec 5-1).
 
 import "server-only";
 import {
@@ -17,24 +19,20 @@ import {
   KISTokenResponse,
 } from "./types";
 
-const DEMO_BASE_URL = "https://openapivts.koreainvestment.com:29443";
-
-class KISAuthService {
+export class KISAuthService {
   private baseUrl: string;
   private appKey: string;
   private appSecret: string;
   private token: KISTokenResponse | null = null;
   private tokenExpiresAt: Date | null = null;
 
-  constructor() {
-    this.baseUrl = process.env.KIS_BASE_URL || DEMO_BASE_URL;
-    this.appKey = process.env.KIS_APP_KEY || "";
-    this.appSecret = process.env.KIS_APP_SECRET || "";
+  constructor(options: { baseUrl: string; appKey: string; appSecret: string; label: string }) {
+    this.baseUrl = options.baseUrl;
+    this.appKey = options.appKey;
+    this.appSecret = options.appSecret;
 
     if (!this.appKey || !this.appSecret) {
-      throw new Error(
-        "KIS API credentials not configured. Set KIS_APP_KEY and KIS_APP_SECRET."
-      );
+      throw new Error(`KIS API credentials not configured for ${options.label}.`);
     }
   }
 
@@ -150,5 +148,3 @@ class KISAuthService {
     }
   }
 }
-
-export const kisAuth = new KISAuthService();

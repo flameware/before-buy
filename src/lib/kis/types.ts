@@ -32,8 +32,19 @@ export interface ProcessedStockPrice {
   volume?: number;
   change?: number;
   changePercent?: number;
+  per?: number;
+  pbr?: number;
   metadata: {
     /** The raw KIS payload, kept verbatim so a schema can be written from real data. */
+    originalData: unknown;
+    lastUpdated: string;
+  };
+}
+
+export interface FinancialRatio {
+  ticker: string;
+  metadata: {
+    /** The raw KIS payload — PER/PBR field names are unconfirmed until issue #13. */
     originalData: unknown;
     lastUpdated: string;
   };
