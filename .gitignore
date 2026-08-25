@@ -1,2 +1,4 @@
 .DS_Store
 docs/prd
+.claude/
+프로토타입 기술스펙*.md
