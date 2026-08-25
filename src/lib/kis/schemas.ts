@@ -57,8 +57,20 @@ export const KoreanPriceOutputSchema = z.looseObject({
   acml_vol: optionalKisNumber, // 누적 거래량
   prdy_vrss: optionalKisNumber, // 전일 대비
   prdy_ctrt: kisRate, // 전일 대비율
+  // PER/PBR은 재무비율(FHKST66430300)이 아니라 이 현재가 응답 자체에 실려 온다 —
+  // issue #13에서 실전 키로 실 호출해 확인(docs/research/kis-financial-ratio.md).
+  per: optionalKisNumber,
+  pbr: optionalKisNumber,
 });
 export type KoreanPriceOutput = z.infer<typeof KoreanPriceOutputSchema>;
+
+/**
+ * `FHKST66430300` 국내주식 재무비율 — PER/PBR은 여기 없다(위 참고). 실제 확인된
+ * 필드(stac_yymm/grs/bsop_prfi_inrt/ntin_inrt/roe_val/eps/sps/bps/rsrv_rate/
+ * lblt_rate)는 `docs/research/kis-financial-ratio.md` 참고. `looseObject`라
+ * 미확정 필드도 `metadata.originalData`로 보존된다.
+ */
+export const FinancialRatioOutputSchema = z.looseObject({});
 
 /** Flatten Zod issues into one line suitable for error messages. */
 export function describeIssues(error: z.ZodError): string {
