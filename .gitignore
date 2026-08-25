@@ -2,3 +2,24 @@
 docs/prd
 .claude/
 프로토타입 기술스펙*.md
+
+# next.js
+/.next/
+/out/
+
+# node
+/node_modules/
+bun-debug.log*
+
+# env
+.env
+.env.local
+.env*.local
+
+# build
+/build
+*.tsbuildinfo
+next-env.d.ts
+
+# vercel
+.vercel
