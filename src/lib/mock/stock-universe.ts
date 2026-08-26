@@ -31,6 +31,7 @@ export const STOCK_UNIVERSE: Stock[] = [
   { ticker: "066570", name: "LG전자", sector: "가전", exchange: "KOSPI" },
   { ticker: "293490", name: "카카오게임즈", sector: "게임", exchange: "KOSDAQ" },
   { ticker: "383220", name: "F&F", sector: "패션/의류", exchange: "KOSPI" },
+  { ticker: "377300", name: "카카오페이", sector: "핀테크/결제", exchange: "KOSPI" },
 ];
 
 /** S1.5 "인기 종목" 5개 — 화이트리스트에서 고정 선정. */
@@ -76,4 +77,5 @@ export const STATIC_QUOTES: Record<string, { price: number; changePercent: numbe
   "066570": { price: 98500, changePercent: 0.5 },
   "293490": { price: 21400, changePercent: -2.3 },
   "383220": { price: 42800, changePercent: 0.8 },
+  "377300": { price: 46300, changePercent: 0.4 },
 };

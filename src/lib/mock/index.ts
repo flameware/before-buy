@@ -44,7 +44,7 @@ export function stockFor(item: Pick<WatchlistItem, "ticker">): Stock {
 }
 
 /**
- * 인메모리 관심종목 목록. 시드 3종에 세션 중 사용자가 담은 종목(user-watchlist.ts)이
+ * 인메모리 관심종목 목록. 시드 5종에 세션 중 사용자가 담은 종목(user-watchlist.ts)이
  * 이어붙는다 — 새로고침 시 시드만 남는 건 의도된 동작
  * (Notes: "S2에서 담은 종목은 새로고침 시 휘발되어도 무방").
  */
