@@ -79,17 +79,17 @@ type LoadState =
 export function StockDetailView({ ticker, stockName }: { ticker: string; stockName: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isFuture, hydrated } = useDemoScenario();
+  const { scenario, hydrated } = useDemoScenario();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const loadingRef = useRef(false);
 
   useEffect(() => {
     if (!hydrated || loadingRef.current) return;
     loadingRef.current = true;
-    getWatchlistItemDetailAction(ticker, isFuture).then((item) => {
+    getWatchlistItemDetailAction(ticker, scenario).then((item) => {
       setState(item ? { status: "ready", item } : { status: "not-found" });
     });
-  }, [ticker, isFuture, hydrated]);
+  }, [ticker, scenario, hydrated]);
 
   if (!hydrated || state.status === "loading") {
     return <ScreenHeader title={stockName} />;

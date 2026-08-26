@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Accepted. 단, **"목록은 토글과 무관하게 유지된다"는 판단은 ADR-0004가 대체한다**
+(Superseded in part by 0004) — 데모 시점은 시세 표시 옵션이 아니라 전제 판정의
+입력이었고, 그 오해가 실제 버그로 드러났다. React Query 도입과 목록/시세 분리라는
+결론 자체는 유효하다.
 
 ## Context
 

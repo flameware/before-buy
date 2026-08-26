@@ -44,7 +44,7 @@ export function OrderConfirmContent({
   variant: "modal" | "page";
 }) {
   const router = useRouter();
-  const { isFuture, hydrated } = useDemoScenario();
+  const { scenario, hydrated } = useDemoScenario();
   const [qty, setQty] = useState(INITIAL_QTY);
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const loadingRef = useRef(false);
@@ -53,10 +53,10 @@ export function OrderConfirmContent({
   useEffect(() => {
     if (!hydrated || loadingRef.current) return;
     loadingRef.current = true;
-    getOrderConfirmItemAction(ticker, isFuture).then((item) => {
+    getOrderConfirmItemAction(ticker, scenario).then((item) => {
       setState(item ? { status: "ready", item } : { status: "not-found" });
     });
-  }, [ticker, isFuture, hydrated]);
+  }, [ticker, scenario, hydrated]);
 
   function record(action: OrderEventAction) {
     if (recordedRef.current || state.status !== "ready") return;
