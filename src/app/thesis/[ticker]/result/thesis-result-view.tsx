@@ -16,6 +16,30 @@ function isAutoCheck(checkType: CheckType): boolean {
   return checkType === "price" || checkType === "valuation";
 }
 
+const LOADING_STAGE_MESSAGES = [
+  "종목을 분석하고 있어요",
+  "반박 근거를 찾는 중이에요",
+  "거의 다 됐어요, 조금만 더...",
+] as const;
+
+// 실제 LLM 진행 단계(시세 조회 → 호출 → 검증 재시도)는 프론트에서 알 수 없으므로,
+// 체감 대기시간을 줄이려고 경과 시간 기준으로만 문구를 바꾼다 — 실제 단계와는 무관하다.
+function useLoadingStageMessage(active: boolean): string {
+  const [stage, setStage] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    setStage(0);
+    const timers = [
+      setTimeout(() => setStage(1), 7000),
+      setTimeout(() => setStage(2), 18000),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, [active]);
+
+  return LOADING_STAGE_MESSAGES[stage];
+}
+
 function critiqueOutputToThesis(
   category: Thesis["category"],
   followup: Thesis["followup"],
@@ -56,6 +80,7 @@ export function ThesisResultView({ ticker, stockName }: { ticker: string; stockN
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [committing, setCommitting] = useState(false);
   const generatingRef = useRef(false);
+  const loadingMessage = useLoadingStageMessage(state.status === "loading");
 
   async function load() {
     try {
@@ -101,7 +126,20 @@ export function ThesisResultView({ ticker, stockName }: { ticker: string; stockN
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticker]);
 
-  if (state.status === "loading") return null;
+  if (state.status === "loading") {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+        <div
+          className="h-10 w-10 animate-spin rounded-full border-4 border-muted border-t-primary"
+          aria-hidden="true"
+        />
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-medium">{loadingMessage}</p>
+          <p className="text-xs text-muted-foreground">최대 30초 정도 걸릴 수 있어요</p>
+        </div>
+      </div>
+    );
+  }
 
   if (state.status === "no-draft") {
     return (
