@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Minus, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -75,13 +76,33 @@ export function OrderConfirmContent({ ticker, stockName }: { ticker: string; sto
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">수량</span>
-            <Input
-              type="number"
-              min={1}
-              value={qty}
-              onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
-              className="w-20 text-right"
-            />
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                onClick={() => setQty((q) => Math.max(1, q - 1))}
+                aria-label="수량 줄이기"
+              >
+                <Minus />
+              </Button>
+              <Input
+                type="number"
+                min={1}
+                value={qty}
+                onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
+                className="w-14 text-center"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                onClick={() => setQty((q) => q + 1)}
+                aria-label="수량 늘리기"
+              >
+                <Plus />
+              </Button>
+            </div>
           </div>
           <div className="flex items-center justify-between text-sm text-muted-foreground">
             <span>합계</span>
