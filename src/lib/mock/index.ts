@@ -1,11 +1,14 @@
 import { findStock, STATIC_QUOTES } from "./stock-universe";
 import { resolveSeedItems, resolveSeedQuote } from "./seed-data";
+import { getUserWatchlistItems } from "./user-watchlist";
 import type { BadgeState, QuoteSnapshot, Stock, WatchlistItem } from "./types";
 
 export * from "./types";
 export * from "./categories";
 export { STOCK_UNIVERSE, POPULAR_TICKERS, findStock, searchStocks } from "./stock-universe";
 export { setThesisDraft, getThesisDraft, type ThesisDraft } from "./thesis-draft";
+export { addUserWatchlistItem } from "./user-watchlist";
+export { generateCritique, generatePremises } from "./critique";
 
 /** 근거 없음 / 유지 중 / 달라짐. CONTEXT.md "배지 상태" — 정확히 이 3개뿐. */
 export function badgeState(item: WatchlistItem): BadgeState {
@@ -41,12 +44,12 @@ export function stockFor(item: Pick<WatchlistItem, "ticker">): Stock {
 }
 
 /**
- * 인메모리 관심종목 목록. 시드 3종으로 시작하고, 세션 중 사용자가 담은 종목이
- * (React state를 통해) 여기 이어붙는다 — 새로고침 시 시드로 리셋되는 건 의도된 동작
+ * 인메모리 관심종목 목록. 시드 3종에 세션 중 사용자가 담은 종목(user-watchlist.ts)이
+ * 이어붙는다 — 새로고침 시 시드만 남는 건 의도된 동작
  * (Notes: "S2에서 담은 종목은 새로고침 시 휘발되어도 무방").
  */
 export function initialWatchlist(isFuture: boolean): WatchlistItem[] {
-  return resolveSeedItems(isFuture);
+  return [...resolveSeedItems(isFuture), ...getUserWatchlistItems()];
 }
 
 export function splitByStatus(items: WatchlistItem[]) {

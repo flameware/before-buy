@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -41,7 +41,25 @@ function badgeVariant(state: BadgeState): "outline" | "secondary" | "destructive
   }
 }
 
-function StockCard({ item, isFuture }: { item: WatchlistItem; isFuture: boolean }) {
+function HighlightParam({ onHighlight }: { onHighlight: (ticker: string | null) => void }) {
+  const searchParams = useSearchParams();
+  const ticker = searchParams.get("highlight");
+  useEffect(() => {
+    onHighlight(ticker);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticker]);
+  return null;
+}
+
+function StockCard({
+  item,
+  isFuture,
+  highlighted,
+}: {
+  item: WatchlistItem;
+  isFuture: boolean;
+  highlighted?: boolean;
+}) {
   const router = useRouter();
   const stock = stockFor(item);
   const quote = quoteFor(item, isFuture);
@@ -55,7 +73,10 @@ function StockCard({ item, isFuture }: { item: WatchlistItem; isFuture: boolean 
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") router.push(`/stocks/${item.ticker}`);
       }}
-      className="flex w-full items-center gap-3 rounded-2xl bg-card px-4 py-3 text-left ring-1 ring-foreground/10"
+      className={
+        "flex w-full items-center gap-3 rounded-2xl bg-card px-4 py-3 text-left ring-1 transition-shadow " +
+        (highlighted ? "ring-2 ring-primary" : "ring-foreground/10")
+      }
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center gap-1.5">
@@ -95,13 +116,27 @@ function StockCard({ item, isFuture }: { item: WatchlistItem; isFuture: boolean 
 }
 
 export default function Home() {
+  const router = useRouter();
   const { isFuture, toggle, hydrated } = useDemoScenario();
   const watchlist = useMemo(() => initialWatchlist(isFuture), [isFuture]);
   const { watching, bought } = splitByStatus(watchlist);
   const numChanged = changedCount(watchlist);
+  const [highlightTicker, setHighlightTicker] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!highlightTicker) return;
+    const timer = setTimeout(() => {
+      setHighlightTicker(null);
+      router.replace("/", { scroll: false });
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [highlightTicker, router]);
 
   return (
     <>
+      <Suspense fallback={null}>
+        <HighlightParam onHighlight={setHighlightTicker} />
+      </Suspense>
       <header className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-3">
         <div className="flex items-center justify-between">
           <h1 className="text-base font-semibold">관심종목</h1>
@@ -131,7 +166,12 @@ export default function Home() {
           {watching.length > 0 ? (
             <div className="flex flex-col gap-2">
               {watching.map((item) => (
-                <StockCard key={item.id} item={item} isFuture={isFuture} />
+                <StockCard
+                  key={item.id}
+                  item={item}
+                  isFuture={isFuture}
+                  highlighted={item.ticker === highlightTicker}
+                />
               ))}
             </div>
           ) : (
