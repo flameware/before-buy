@@ -1,7 +1,12 @@
 .DS_Store
 docs/prd
 .claude/
-프로토타입 기술스펙*.md
+
+# root-level spec/doc files — keep only these
+/*.md
+!/AGENTS.md
+!/CLAUDE.md
+!/README.md
 
 # next.js
 /.next/
