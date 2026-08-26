@@ -22,6 +22,13 @@
       "when": 1787727424738,
       "tag": "0002_chunky_old_lace",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787741303388,
+      "tag": "0003_tiresome_strong_guy",
+      "breakpoints": true
     }
   ]
 }

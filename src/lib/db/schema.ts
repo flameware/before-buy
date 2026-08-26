@@ -78,6 +78,17 @@ export const premises = pgTable("premises", {
   observedValue: text("observed_value"),
 });
 
+// KIS OAuth 접근토큰 — 인스턴스 메모리 대신 여기 영속화해 서버리스 콜드 스타트/
+// 인스턴스 교체 사이에도 재사용한다(issue #59). key는 "quote"|"trade" — quote-client/
+// trade-client의 자격증명 분리를 그대로 반영한다. refreshingSince는 발급 요청이
+// KIS 분당 1회 제한에 동시에 걸리지 않도록 인스턴스 간 발급을 직렬화하는 데 쓴다.
+export const kisTokens = pgTable("kis_tokens", {
+  key: text("key").primaryKey(), // "quote" | "trade"
+  accessToken: text("access_token"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  refreshingSince: timestamp("refreshing_since", { withTimezone: true }),
+});
+
 export const orderEvents = pgTable("order_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   sessionId: uuid("session_id")
