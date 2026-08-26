@@ -6,7 +6,7 @@ import { getExistingThesis } from "@/lib/thesis/get-existing-thesis";
 import type { CritiqueOutput } from "@/lib/llm/types";
 import { getWatchlistListView, getWatchlistQuoteMap, type WatchlistListItem, type WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
 import { getWatchlistItemDetail, getWatchlistItemForOrder, removeWatchlistItem } from "@/lib/watchlist/get-watchlist-item";
-import { recordOrderEvent, type OrderEventInput } from "@/lib/order/record-order-event";
+import { recordOrderEvent, recordOrderEventByTicker, type OrderEventInput } from "@/lib/order/record-order-event";
 import type { DemoScenario, QuoteSnapshot, Thesis } from "@/lib/mock/types";
 
 /**
@@ -59,6 +59,13 @@ export async function getOrderConfirmItemAction(
 /** S4 취소/구매/시트닫기/근거갱신 4개 분기 모두에서 호출: order_events 1건을 남긴다. */
 export async function recordOrderEventAction(input: OrderEventInput): Promise<void> {
   return recordOrderEvent(input);
+}
+
+/** S4: 근거가 뜨기 전에 닫은 경우 — watchlist_item_id를 서버에서 티커로 찾아 남긴다. */
+export async function recordOrderEventByTickerAction(
+  input: Omit<OrderEventInput, "watchlistItemId"> & { ticker: string }
+): Promise<void> {
+  return recordOrderEventByTicker(input);
 }
 
 /** S5 진입: 해당 종목 1건을 조회한다. 전제 상태는 이 시점 시세로 계산된다. */

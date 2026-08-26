@@ -1,21 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
 import { badgeLabel, badgeState, changedCount, splitByStatus, type BadgeState } from "@/lib/mock";
-import { resolvePremises } from "@/lib/premises/engine";
-import { loadWatchlistList, loadWatchlistQuotes } from "./actions";
+import { useWatchlistView } from "@/hooks/use-watchlist-view";
 import type { WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
-
-/** ADR-0002: 목록은 60초, 시세는 20초 — 재방문 시 캐시가 신선하면 즉시 렌더하고 조용히 갱신한다. */
-const LIST_STALE_TIME_MS = 60_000;
-const QUOTES_STALE_TIME_MS = 20_000;
 
 const priceFormat = new Intl.NumberFormat("ko-KR");
 
@@ -121,52 +115,10 @@ export default function Home() {
   const { scenario, toggle, hydrated } = useDemoScenario();
   const [highlightTicker, setHighlightTicker] = useState<string | null>(null);
 
-  // ADR-0004: 목록은 데모 시점과 무관한 DB 사실(종목/근거/기준값)만 담는다. 토글해도
-  // 이 쿼리는 다시 돌 필요가 없다 — 시점에 반응해야 하는 것은 아래 시세 쿼리뿐이다.
-  const listQuery = useQuery({
-    queryKey: ["watchlist", "list"],
-    queryFn: () => loadWatchlistList(),
-    enabled: hydrated,
-    staleTime: LIST_STALE_TIME_MS,
-  });
+  // 목록+시세 합성과 ADR-0004의 불변식은 useWatchlistView 안에 있다 — S4/S5도 같은
+  // 훅을 쓰므로 이 조합이 화면마다 복제되지 않는다.
+  const { items: watchlist, isLoading: loading } = useWatchlistView(scenario, hydrated);
 
-  const listItems = useMemo(() => listQuery.data ?? [], [listQuery.data]);
-  const quoteTargets = useMemo(
-    () => listItems.map((item) => ({ ticker: item.ticker, isSeed: item.isSeed })),
-    [listItems]
-  );
-  const tickerKey = quoteTargets
-    .map((t) => t.ticker)
-    .sort()
-    .join(",");
-
-  // 데모 시점에 의존하는 것은 이 쿼리뿐이고 그 뒤에 공유 상태가 없으므로, 시점을 키에
-  // 넣어 시나리오별 캐시 엔트리로 자연 분리한다 — 명시적 무효화가 필요 없다(ADR-0004).
-  const quotesQuery = useQuery({
-    queryKey: ["watchlist", "quotes", scenario, tickerKey],
-    queryFn: () => loadWatchlistQuotes(quoteTargets, scenario),
-    enabled: hydrated && quoteTargets.length > 0,
-    staleTime: QUOTES_STALE_TIME_MS,
-  });
-
-  // 배지는 화면에 그리는 바로 그 시세에서 나온다. 가격만 미래로 바뀌고 배지가 과거에
-  // 남는 일이 구조적으로 불가능해진다(ADR-0004).
-  const watchlist: WatchlistViewItem[] = useMemo(
-    () =>
-      listItems.map((item) => {
-        const quote = quotesQuery.data?.[item.ticker] ?? null;
-        return {
-          ...item,
-          quote,
-          thesis: item.thesis
-            ? { ...item.thesis, premises: resolvePremises(item.thesis.premises, quote) }
-            : undefined,
-        };
-      }),
-    [listItems, quotesQuery.data]
-  );
-
-  const loading = listQuery.isLoading;
   const { watching, bought } = splitByStatus(watchlist);
   const numChanged = changedCount(watchlist);
 

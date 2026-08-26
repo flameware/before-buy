@@ -1,0 +1,189 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  getWatchlistItemDetailAction,
+  loadWatchlistList,
+  loadWatchlistQuotes,
+} from "@/app/actions";
+import { resolvePremises } from "@/lib/premises/engine";
+import type { DemoScenario, QuoteSnapshot } from "@/lib/mock/types";
+import type { WatchlistListItem, WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
+
+/** ADR-0002: 목록은 60초, 시세는 20초 — 재방문 시 캐시가 신선하면 즉시 렌더하고 조용히 갱신한다. */
+const LIST_STALE_TIME_MS = 60_000;
+const QUOTES_STALE_TIME_MS = 20_000;
+
+const LIST_KEY = ["watchlist", "list"] as const;
+
+function quotesKey(scenario: DemoScenario, tickerKey: string) {
+  return ["watchlist", "quotes", scenario, tickerKey] as const;
+}
+
+function toTickerKey(items: { ticker: string }[]): string {
+  return items
+    .map((i) => i.ticker)
+    .sort()
+    .join(",");
+}
+
+/**
+ * ADR-0004의 불변식이 사는 곳: **배지는 화면에 그리는 바로 그 시세에서 나온다.**
+ * 목록(시점과 무관한 DB 사실)과 시세를 만나게 하는 자리가 여기 하나뿐이어야, 가격만
+ * 바뀌고 배지가 과거에 남는 일이 구조적으로 불가능해진다. 화면마다 이 합성을 다시 쓰면
+ * 그 불변식도 화면 수만큼 복제된다 — 이미 한 번 버그로 드러난 지점이다.
+ */
+export function composeView(
+  item: WatchlistListItem,
+  quote: QuoteSnapshot | null
+): WatchlistViewItem {
+  return {
+    ...item,
+    quote,
+    thesis: item.thesis
+      ? { ...item.thesis, premises: resolvePremises(item.thesis.premises, quote) }
+      : undefined,
+  };
+}
+
+/**
+ * S1 관심종목 목록. 목록 쿼리와 시세 쿼리를 분리해 서로 다른 신선도로 캐싱하고
+ * (ADR-0002), 데모 시점은 시세 쿼리 키에만 들어간다 (ADR-0004).
+ *
+ * `scenario`를 인자로 받는 이유: `useDemoScenario`는 `useState` 기반이라 여기서 다시
+ * 호출하면 호출부와 별개의 상태가 생겨 토글이 어긋난다.
+ */
+export function useWatchlistView(scenario: DemoScenario, hydrated: boolean) {
+  const listQuery = useQuery({
+    queryKey: LIST_KEY,
+    queryFn: () => loadWatchlistList(),
+    enabled: hydrated,
+    staleTime: LIST_STALE_TIME_MS,
+  });
+
+  const listItems = useMemo(() => listQuery.data ?? [], [listQuery.data]);
+  const quoteTargets = useMemo(
+    () => listItems.map((item) => ({ ticker: item.ticker, isSeed: item.isSeed })),
+    [listItems]
+  );
+  const tickerKey = toTickerKey(quoteTargets);
+
+  const quotesQuery = useQuery({
+    queryKey: quotesKey(scenario, tickerKey),
+    queryFn: () => loadWatchlistQuotes(quoteTargets, scenario),
+    enabled: hydrated && quoteTargets.length > 0,
+    staleTime: QUOTES_STALE_TIME_MS,
+  });
+
+  const items = useMemo(
+    () => listItems.map((item) => composeView(item, quotesQuery.data?.[item.ticker] ?? null)),
+    [listItems, quotesQuery.data]
+  );
+
+  return { items, isLoading: listQuery.isLoading };
+}
+
+export type ItemViewStatus = "loading" | "not-found" | "ready";
+
+/**
+ * S4 주문 전 확인 / S5 관심종목 상세가 쓰는 1건 조회.
+ *
+ * S1에서 넘어온 경우 필요한 것이 이미 목록 캐시에 있으므로 **DB를 다시 부르지 않는다**
+ * — 예전에는 두 화면 모두 `useEffect`에서 서버 액션을 직접 불러 매번 ~800ms 동안 빈
+ * 화면을 보여줬다. 캐시에 없을 때(hard-nav로 URL 직접 진입)만 1건짜리 서버 액션으로
+ * 폴백한다. "캐시에 있다"는 양성 신호지만 "없다"는 부재의 증거가 아니라서, 캐시 미스를
+ * 곧바로 not-found로 해석하지 않는다.
+ *
+ * 목록 캐시는 `getQueryData`로 **구독 없이** 읽는다. `useQuery`로 구독하면 미스일 때
+ * 목록 전체(N종목 + 근거 + 전제)를 끌어오는데, 콜드 경로에서는 1건짜리 조회가 더 싸다.
+ *
+ * 시세는 캐시 값으로 즉시 그리되 한 번 재검증한다(`refetchOnMount: "always"`).
+ * 시세 쿼리에는 `refetchInterval`이 없고 S4는 인터셉트 모달이라 S1이 언마운트되지
+ * 않으므로, 재검증하지 않으면 캐시된 시세가 20초가 아니라 S1을 열어둔 시간만큼
+ * 오래될 수 있다. 반환하는 `quoteSettled`가 그 재검증이 끝났는지를 알려준다 —
+ * S4는 이 값을 `useFrozen`에 넘겨 재검증된 시세에 고정한다(ADR-0005).
+ */
+export function useWatchlistItemView(
+  ticker: string,
+  scenario: DemoScenario,
+  hydrated: boolean
+) {
+  const queryClient = useQueryClient();
+
+  // 캐시 경로/콜드 경로 중 무엇을 탈지는 마운트 시점에 한 번만 정한다. 매 렌더마다 다시
+  // 판단하면 배경에서 목록 캐시가 채워지는 순간 경로가 바뀌어 시세가 두 번 정착한다.
+  // (`hydrated`로 막지 않는다 — 목록 캐시의 존재 여부는 데모 시점과 무관하다.)
+  const [cachedList] = useState<WatchlistListItem[]>(
+    () => queryClient.getQueryData<WatchlistListItem[]>(LIST_KEY) ?? []
+  );
+  const cachedItem = cachedList.find((i) => i.ticker === ticker) ?? null;
+
+  const quoteTargets = useMemo(
+    () => cachedList.map((item) => ({ ticker: item.ticker, isSeed: item.isSeed })),
+    [cachedList]
+  );
+  const tickerKey = toTickerKey(quoteTargets);
+
+  // S1과 같은 쿼리 키를 쓴다 — 재검증 결과가 S1의 가격에도 반영되어 캐시가 갈라지지
+  // 않는다. KIS 조회는 배치라 N종목이 1회 호출이므로 티커 하나만 따로 부를 이유도 없다.
+  const quotesQuery = useQuery({
+    queryKey: quotesKey(scenario, tickerKey),
+    queryFn: () => loadWatchlistQuotes(quoteTargets, scenario),
+    enabled: hydrated && cachedItem != null && quoteTargets.length > 0,
+    staleTime: QUOTES_STALE_TIME_MS,
+    refetchOnMount: "always",
+  });
+
+  // 콜드 경로: 목록 캐시에 없는 종목. 합성된 1건을 받아 목록/시세로 되쪼갠다.
+  const [cold, setCold] = useState<
+    { status: "loading" } | { status: "not-found" } | { status: "ready"; item: WatchlistViewItem }
+  >({ status: "loading" });
+  const coldStartedRef = useRef(false);
+  const needsCold = hydrated && cachedItem == null;
+
+  useEffect(() => {
+    if (!needsCold || coldStartedRef.current) return;
+    coldStartedRef.current = true;
+    getWatchlistItemDetailAction(ticker, scenario).then((item) => {
+      setCold(item ? { status: "ready", item } : { status: "not-found" });
+    });
+  }, [needsCold, ticker, scenario]);
+
+  if (cachedItem) {
+    return {
+      status: "ready" as ItemViewStatus,
+      listItem: cachedItem,
+      quote: quotesQuery.data?.[ticker] ?? null,
+      // 재검증이 끝나야 고정해도 되는 값이 된다.
+      quoteSettled: !quotesQuery.isFetching,
+    };
+  }
+
+  if (!hydrated || cold.status === "loading") {
+    return {
+      status: "loading" as ItemViewStatus,
+      listItem: null,
+      quote: null,
+      quoteSettled: false,
+    };
+  }
+
+  if (cold.status === "not-found") {
+    return {
+      status: "not-found" as ItemViewStatus,
+      listItem: null,
+      quote: null,
+      quoteSettled: true,
+    };
+  }
+
+  // 콜드 경로 결과는 이미 조회 시점의 시세라 재검증할 것이 없다.
+  const { quote, ...listItem } = cold.item;
+  return {
+    status: "ready" as ItemViewStatus,
+    listItem: listItem as WatchlistListItem,
+    quote,
+    quoteSettled: true,
+  };
+}

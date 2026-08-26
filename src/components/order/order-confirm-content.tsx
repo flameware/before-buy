@@ -1,18 +1,20 @@
 "use client";
 
 import { Minus, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { ScreenHeader } from "@/components/layout/screen-header";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
+import { useFrozen } from "@/hooks/use-frozen";
+import { composeView, useWatchlistItemView } from "@/hooks/use-watchlist-view";
 import { badgeState, getCategory } from "@/lib/mock";
-import { getOrderConfirmItemAction, recordOrderEventAction } from "@/app/actions";
+import { recordOrderEventAction, recordOrderEventByTickerAction } from "@/app/actions";
 import type { OrderEventAction } from "@/lib/order/record-order-event";
-import type { WatchlistViewItem } from "@/lib/watchlist/get-watchlist-item";
 
 const priceFormat = new Intl.NumberFormat("ko-KR");
 const INITIAL_QTY = 1;
@@ -21,11 +23,6 @@ function formatPrice(price: number): string {
   return `${priceFormat.format(price)}원`;
 }
 
-type LoadState =
-  | { status: "loading" }
-  | { status: "not-found" }
-  | { status: "ready"; item: WatchlistViewItem };
-
 /**
  * S4 본문 — Drawer(소프트 내비게이션)와 전체 페이지(하드 내비게이션 폴백) 양쪽에서
  * 공유한다. 취소 버튼/외부 탭(Drawer)/헤더 뒤로가기(전체 페이지) 모두 같은 "나가기"
@@ -33,6 +30,11 @@ type LoadState =
  * order_events cancel을 남기는 데 필요한 상태(수량, 종목)가 여기 한 곳에만 있고,
  * 부모 컴포넌트로 ref를 넘기는 대신 이렇게 하면 각 나가기 지점에서 명시적으로
  * 한 번만 기록하면 된다.
+ *
+ * 데이터는 `useWatchlistItemView`가 S1의 목록 캐시에서 읽는다. S1에서 넘어온 경우
+ * 근거·전제·종목명은 **첫 프레임부터 완성**되어 있고, 시세만 한 번 재확인한 뒤
+ * `useFrozen`으로 고정된다(ADR-0005) — 이 화면은 목록이 아니라 결정 지점이라
+ * `구매`를 누르기 직전에 합계가 손 밑에서 바뀌어서는 안 된다.
  */
 export function OrderConfirmContent({
   ticker,
@@ -46,31 +48,33 @@ export function OrderConfirmContent({
   const router = useRouter();
   const { scenario, hydrated } = useDemoScenario();
   const [qty, setQty] = useState(INITIAL_QTY);
-  const [state, setState] = useState<LoadState>({ status: "loading" });
-  const loadingRef = useRef(false);
   const recordedRef = useRef(false);
 
-  useEffect(() => {
-    if (!hydrated || loadingRef.current) return;
-    loadingRef.current = true;
-    getOrderConfirmItemAction(ticker, scenario).then((item) => {
-      setState(item ? { status: "ready", item } : { status: "not-found" });
-    });
-  }, [ticker, scenario, hydrated]);
+  const { status, listItem, quote, quoteSettled } = useWatchlistItemView(
+    ticker,
+    scenario,
+    hydrated
+  );
+
+  // 재검증된 시세에 고정한다. 고정 전에는 캐시 값이 그대로 통과하므로 화면이 비지 않는다.
+  const frozenQuote = useFrozen(quote, quoteSettled);
+  const item = listItem ? composeView(listItem, frozenQuote) : null;
 
   function record(action: OrderEventAction) {
-    if (recordedRef.current || state.status !== "ready") return;
+    if (recordedRef.current) return;
     recordedRef.current = true;
-    void recordOrderEventAction({
-      watchlistItemId: state.item.id,
-      thesisShown: !!state.item.thesis,
-      initialQty: INITIAL_QTY,
-      finalQty: qty,
-      action,
-    });
+    const common = { thesisShown: !!item?.thesis, initialQty: INITIAL_QTY, finalQty: qty, action };
+    if (item) {
+      void recordOrderEventAction({ watchlistItemId: item.id, ...common });
+      return;
+    }
+    // 아직 로딩 중이라 watchlistItemId를 모른다 — 서버가 티커로 찾아 남긴다.
+    void recordOrderEventByTickerAction({ ticker, ...common });
   }
 
   function handleExit() {
+    // 근거가 뜨기 전에 나간 것도 남길 값어치가 있는 사건이다 — 예전에는 watchlistItemId를
+    // 아직 몰라 조용히 버려졌다. 화면 이탈은 기록을 기다리지 않는다.
     record("cancel");
     router.back();
   }
@@ -85,53 +89,63 @@ export function OrderConfirmContent({
     router.push(`/thesis/${ticker}`);
   }
 
-  if (state.status === "not-found") {
-    // 세션의 관심종목이 아닌 티커(제거됐거나 애초에 담은 적 없음)로 접근한 경우.
-    // order_events를 남길 watchlist_item_id가 없어 여기서 더 진행할 수 없다.
-    const message = (
-      <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
-        관심종목에서 찾을 수 없는 종목이에요.
-      </div>
-    );
-    return variant === "modal" ? (
-      <Drawer open onOpenChange={(open) => !open && router.back()} showSwipeHandle>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>주문 전 확인</DrawerTitle>
-          </DrawerHeader>
-          {message}
-        </DrawerContent>
-      </Drawer>
-    ) : (
+  function shell(children: React.ReactNode) {
+    if (variant === "modal") {
+      return (
+        <Drawer open onOpenChange={(open) => !open && handleExit()} showSwipeHandle>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>주문 전 확인</DrawerTitle>
+            </DrawerHeader>
+            {children}
+          </DrawerContent>
+        </Drawer>
+      );
+    }
+    return (
       <>
-        <ScreenHeader title="주문 전 확인" />
-        {message}
+        <ScreenHeader title="주문 전 확인" onBack={handleExit} />
+        {children}
       </>
     );
   }
 
-  if (state.status === "loading") {
-    return variant === "modal" ? (
-      <Drawer open onOpenChange={(open) => !open && router.back()} showSwipeHandle>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>주문 전 확인</DrawerTitle>
-          </DrawerHeader>
-        </DrawerContent>
-      </Drawer>
-    ) : null;
+  if (status === "not-found") {
+    // 세션의 관심종목이 아닌 티커(제거됐거나 애초에 담은 적 없음)로 접근한 경우.
+    // order_events를 남길 watchlist_item_id가 없어 여기서 더 진행할 수 없다.
+    return shell(
+      <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
+        관심종목에서 찾을 수 없는 종목이에요.
+      </div>
+    );
   }
 
-  const { item } = state;
-  const quote = item.quote;
-  const thesis = item.thesis;
-  const hasThesis = !!thesis;
-  const changed = hasThesis && badgeState(item) === "changed";
+  const loading = status === "loading" || !item;
+
+  // 근거 카드 자리를 skeleton에서도 잡아둔다. 콜드 경로에서는 그 종목에 근거가 있는지
+  // 로드 전에 알 수 없고(`findStock`은 mock 조회라 DB의 thesis를 모른다), 근거 있음이
+  // 다수 경로다. 실제 본문과 같은 높이를 만들어 drawer의 450ms height 트랜지션이
+  // 탈 구간을 없애는 것이 이 skeleton의 목적이다.
+  const thesis = item?.thesis;
+  const changed = !!thesis && badgeState(item!) === "changed";
 
   const body = (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
-        {hasThesis && thesis ? (
+        {loading ? (
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-5 w-40" />
+            <div className="flex flex-col gap-2 rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
+              <Skeleton className="h-5 w-20" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-2/3" />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">전제 상태</span>
+              <Skeleton className="h-5 w-12 rounded-full" />
+            </div>
+          </div>
+        ) : thesis ? (
           <div className="flex flex-col gap-2">
             <p className="text-sm text-muted-foreground">3주 전에 이렇게 생각하셨어요</p>
             <div className="flex flex-col gap-1 rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
@@ -158,12 +172,18 @@ export function OrderConfirmContent({
           </div>
         ) : null}
 
+        {/* 종목명·수량·버튼은 fetch 없이 첫 프레임부터 그린다 — 수량 조절은 가격을 몰라도
+            의미가 있고, 버튼 바가 처음부터 자리를 잡아야 시트 높이가 흔들리지 않는다. */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">{stockName}</span>
-            <span className="text-sm text-muted-foreground">
-              {quote ? formatPrice(quote.price) : "시세 조회 실패"}
-            </span>
+            {loading ? (
+              <Skeleton className="h-5 w-24" />
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                {item.quote ? formatPrice(item.quote.price) : "시세 조회 실패"}
+              </span>
+            )}
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">수량</span>
@@ -197,7 +217,11 @@ export function OrderConfirmContent({
           </div>
           <div className="flex items-center justify-between text-sm text-muted-foreground">
             <span>합계</span>
-            <span>{quote ? formatPrice(quote.price * qty) : "시세 조회 실패"}</span>
+            {loading ? (
+              <Skeleton className="h-5 w-24" />
+            ) : (
+              <span>{item.quote ? formatPrice(item.quote.price * qty) : "시세 조회 실패"}</span>
+            )}
           </div>
         </div>
       </div>
@@ -206,30 +230,13 @@ export function OrderConfirmContent({
         <Button variant="outline" className="flex-1" onClick={handleExit}>
           취소
         </Button>
-        <Button className="flex-1" onClick={handleBuy}>
+        {/* 근거가 뜨기 전에 살 수 있으면 이 화면의 존재 이유가 무너진다. 나가기는 언제나 열어둔다. */}
+        <Button className="flex-1" onClick={handleBuy} disabled={loading}>
           구매
         </Button>
       </div>
     </div>
   );
 
-  if (variant === "modal") {
-    return (
-      <Drawer open onOpenChange={(open) => !open && handleExit()} showSwipeHandle>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>주문 전 확인</DrawerTitle>
-          </DrawerHeader>
-          {body}
-        </DrawerContent>
-      </Drawer>
-    );
-  }
-
-  return (
-    <>
-      <ScreenHeader title="주문 전 확인" onBack={handleExit} />
-      {body}
-    </>
-  );
+  return shell(body);
 }

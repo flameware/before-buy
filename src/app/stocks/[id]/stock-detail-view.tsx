@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScreenHeader } from "@/components/layout/screen-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
+import { composeView, useWatchlistItemView } from "@/hooks/use-watchlist-view";
 import { getCategory, type CheckType, type FollowupAnswer, type Premise } from "@/lib/mock";
-import { getWatchlistItemDetailAction, removeWatchlistItemAction } from "@/app/actions";
-import type { WatchlistViewItem } from "@/lib/watchlist/get-watchlist-item";
+import { removeWatchlistItemAction } from "@/app/actions";
 
 const priceFormat = new Intl.NumberFormat("ko-KR");
 
@@ -71,31 +71,36 @@ function PremiseRow({ premise }: { premise: Premise }) {
   );
 }
 
-type LoadState =
-  | { status: "loading" }
-  | { status: "not-found" }
-  | { status: "ready"; item: WatchlistViewItem };
-
 export function StockDetailView({ ticker, stockName }: { ticker: string; stockName: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { scenario, hydrated } = useDemoScenario();
-  const [state, setState] = useState<LoadState>({ status: "loading" });
-  const loadingRef = useRef(false);
 
-  useEffect(() => {
-    if (!hydrated || loadingRef.current) return;
-    loadingRef.current = true;
-    getWatchlistItemDetailAction(ticker, scenario).then((item) => {
-      setState(item ? { status: "ready", item } : { status: "not-found" });
-    });
-  }, [ticker, scenario, hydrated]);
+  // S4와 같은 훅을 쓰되 시세는 고정하지 않는다 — S5는 결정 지점이 아니라 조회 화면이라
+  // ADR-0002의 기본값(조용한 재검증)이 그대로 맞다.
+  const { status, listItem, quote } = useWatchlistItemView(ticker, scenario, hydrated);
 
-  if (!hydrated || state.status === "loading") {
-    return <ScreenHeader title={stockName} />;
+  if (status === "loading") {
+    // 예전에는 여기서 헤더만 렌더해 본문이 통째로 비어 있었다.
+    return (
+      <>
+        <ScreenHeader title={stockName} />
+        <div className="flex flex-1 flex-col gap-6 px-4 py-4">
+          <Skeleton className="h-20 rounded-2xl" />
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-28 rounded-2xl" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-24 rounded-2xl" />
+          </div>
+        </div>
+      </>
+    );
   }
 
-  if (state.status === "not-found") {
+  if (status === "not-found" || !listItem) {
     return (
       <>
         <ScreenHeader title={stockName} />
@@ -106,8 +111,7 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
     );
   }
 
-  const { item } = state;
-  const quote = item.quote;
+  const item = composeView(listItem, quote);
   const isBought = item.status === "bought";
   const returnSinceAdded = quote?.changePercent ?? 0;
   const returnSinceBuy =
