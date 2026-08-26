@@ -2,6 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { db } from "./index";
 import { sessions } from "./schema";
+import { provisionSeedItems } from "./seed";
 
 const SESSION_COOKIE = "session_id";
 
@@ -20,8 +21,22 @@ export async function getSessionId(): Promise<string> {
   return sessionId;
 }
 
+/**
+ * Inserts the session row if it doesn't exist yet. A row actually being
+ * inserted (not skipped by the conflict) is how we know this session is
+ * brand new, so we provision the seed watchlist items right here — no
+ * separate "already seeded?" check against `is_seed` needed.
+ */
 export async function ensureSession(sessionId: string): Promise<void> {
-  await db.insert(sessions).values({ id: sessionId }).onConflictDoNothing();
+  const [inserted] = await db
+    .insert(sessions)
+    .values({ id: sessionId })
+    .onConflictDoNothing()
+    .returning({ id: sessions.id });
+
+  if (inserted) {
+    await provisionSeedItems(sessionId);
+  }
 }
 
 /**
