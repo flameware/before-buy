@@ -5,7 +5,7 @@ import { generateThesisResult, type GenerateThesisResultOutcome, type ThesisDraf
 import { getExistingThesis } from "@/lib/thesis/get-existing-thesis";
 import type { CritiqueOutput } from "@/lib/llm/types";
 import { getWatchlistView, type WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
-import { getWatchlistItemForOrder } from "@/lib/watchlist/get-watchlist-item";
+import { getWatchlistItemDetail, getWatchlistItemForOrder, removeWatchlistItem } from "@/lib/watchlist/get-watchlist-item";
 import { recordOrderEvent, type OrderEventInput } from "@/lib/order/record-order-event";
 import type { QuoteSnapshot, Thesis } from "@/lib/mock/types";
 
@@ -48,4 +48,17 @@ export async function getOrderConfirmItemAction(
 /** S4 취소/구매/시트닫기/근거갱신 4개 분기 모두에서 호출: order_events 1건을 남긴다. */
 export async function recordOrderEventAction(input: OrderEventInput): Promise<void> {
   return recordOrderEvent(input);
+}
+
+/** S5 진입: 해당 종목만 단건 재판정한 뒤 최신 상태를 조회한다. */
+export async function getWatchlistItemDetailAction(
+  ticker: string,
+  isFuture: boolean
+): Promise<WatchlistViewItem | null> {
+  return getWatchlistItemDetail(ticker, isFuture);
+}
+
+/** S5 "관심종목에서 제외": watchlist_items.status를 'removed'로 실제 update한다. */
+export async function removeWatchlistItemAction(ticker: string): Promise<void> {
+  return removeWatchlistItem(ticker);
 }

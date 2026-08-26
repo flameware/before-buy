@@ -1,20 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScreenHeader } from "@/components/layout/screen-header";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
-import {
-  getCategory,
-  initialWatchlist,
-  quoteFor,
-  removeWatchlistItem,
-  type CheckType,
-  type FollowupAnswer,
-  type Premise,
-} from "@/lib/mock";
+import { getCategory, type CheckType, type FollowupAnswer, type Premise } from "@/lib/mock";
+import { getWatchlistItemDetailAction, removeWatchlistItemAction } from "@/app/actions";
+import type { WatchlistViewItem } from "@/lib/watchlist/get-watchlist-item";
 
 const priceFormat = new Intl.NumberFormat("ko-KR");
 
@@ -76,21 +70,30 @@ function PremiseRow({ premise }: { premise: Premise }) {
   );
 }
 
+type LoadState =
+  | { status: "loading" }
+  | { status: "not-found" }
+  | { status: "ready"; item: WatchlistViewItem };
+
 export function StockDetailView({ ticker, stockName }: { ticker: string; stockName: string }) {
   const router = useRouter();
   const { isFuture, hydrated } = useDemoScenario();
+  const [state, setState] = useState<LoadState>({ status: "loading" });
+  const loadingRef = useRef(false);
 
-  const item = useMemo(
-    () => initialWatchlist(isFuture).find((i) => i.ticker === ticker),
-    [ticker, isFuture],
-  );
-  const quote = quoteFor({ ticker, isSeed: item?.isSeed ?? false }, isFuture);
+  useEffect(() => {
+    if (!hydrated || loadingRef.current) return;
+    loadingRef.current = true;
+    getWatchlistItemDetailAction(ticker, isFuture).then((item) => {
+      setState(item ? { status: "ready", item } : { status: "not-found" });
+    });
+  }, [ticker, isFuture, hydrated]);
 
-  if (!hydrated) {
+  if (!hydrated || state.status === "loading") {
     return <ScreenHeader title={stockName} />;
   }
 
-  if (!item) {
+  if (state.status === "not-found") {
     return (
       <>
         <ScreenHeader title={stockName} />
@@ -101,17 +104,19 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
     );
   }
 
+  const { item } = state;
+  const quote = item.quote;
   const isBought = item.status === "bought";
-  const returnSinceAdded = quote.changePercent;
+  const returnSinceAdded = quote?.changePercent ?? 0;
   const returnSinceBuy =
-    isBought && item.avgBuyPrice ? ((quote.price - item.avgBuyPrice) / item.avgBuyPrice) * 100 : 0;
+    isBought && item.avgBuyPrice && quote ? ((quote.price - item.avgBuyPrice) / item.avgBuyPrice) * 100 : 0;
 
   function handleUpdateThesis() {
     router.push(`/thesis/${ticker}`);
   }
 
   function handleRemove() {
-    removeWatchlistItem(item!.id);
+    void removeWatchlistItemAction(ticker);
     router.push("/");
   }
 
@@ -131,12 +136,16 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
                   매수 {formatPrice(item.avgBuyPrice ?? 0)} ({item.boughtAt ? formatDate(item.boughtAt) : "-"})
                 </span>
                 <span className="text-muted-foreground">→</span>
-                <span className="font-medium">현재 {formatPrice(quote.price)}</span>
+                <span className="font-medium">
+                  현재 {quote ? formatPrice(quote.price) : "시세 조회 실패"}
+                </span>
               </div>
-              <div className="flex items-center gap-3 text-xs">
-                <span className={changeColor(returnSinceAdded)}>근거 대비 {formatChange(returnSinceAdded)}</span>
-                <span className={changeColor(returnSinceBuy)}>손익 {formatChange(returnSinceBuy)}</span>
-              </div>
+              {quote ? (
+                <div className="flex items-center gap-3 text-xs">
+                  <span className={changeColor(returnSinceAdded)}>근거 대비 {formatChange(returnSinceAdded)}</span>
+                  <span className={changeColor(returnSinceBuy)}>손익 {formatChange(returnSinceBuy)}</span>
+                </div>
+              ) : null}
             </>
           ) : (
             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
@@ -144,8 +153,12 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
                 담은 날 {formatPrice(item.addedPrice)} ({formatDate(item.addedAt)})
               </span>
               <span className="text-muted-foreground">→</span>
-              <span className="font-medium">현재 {formatPrice(quote.price)}</span>
-              <span className={`text-xs ${changeColor(returnSinceAdded)}`}>{formatChange(returnSinceAdded)}</span>
+              <span className="font-medium">
+                현재 {quote ? formatPrice(quote.price) : "시세 조회 실패"}
+              </span>
+              {quote ? (
+                <span className={`text-xs ${changeColor(returnSinceAdded)}`}>{formatChange(returnSinceAdded)}</span>
+              ) : null}
             </div>
           )}
         </section>
