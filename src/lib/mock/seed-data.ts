@@ -1,9 +1,16 @@
 import type { Premise, QuoteSnapshot, Thesis, WatchlistItem } from "./types";
 
 /**
- * 데모 시드 3종 (기술스펙 7장). "현재" / "3개월 후" 두 값을 각각 들고 있다가
+ * 데모 시드 5종 (기술스펙 7장). "현재" / "3개월 후" 두 값을 각각 들고 있다가
  * `resolveSeedItems(isFuture)`에서 하나로 합쳐 반환한다. 실사용자가 담은 종목은
  * 시나리오를 타지 않고 항상 실제(=현재) 데이터를 쓴다 (기술스펙 7장).
+ *
+ * price/valuation 전제의 자동 판정(engine.ts)은 현재 시점(isFuture=false)에는
+ * 시드 종목도 실시간 KIS 시세를 baseline으로 쓴다 — 여기 적힌 "current" 값이
+ * 아니라 `SEED_PREMISE_CHECK_CONFIG`(db/seed.ts)의 임계값과 그 실시간 시세를
+ * 비교한다. 그래서 이 임계값들은 2026-08-26 KIS 실측가 기준으로 맞춰뒀다.
+ * 절대값 비교라 시세가 계속 움직이면 다시 깨질 수 있다는 점은 감수한다
+ * (issue #65).
  */
 
 interface SeedPremiseVariant {
@@ -33,29 +40,29 @@ interface SeedItem {
   quote: { current: QuoteSnapshot; future: QuoteSnapshot };
 }
 
-// 종목 A — SK텔레콤. 담은 뒤 매수까지 한 케이스(보유중), 가격이 올라 저평가 전제가 깨진다.
-// "좋은 소식인데 내 근거는 무효가 된" 케이스 (기술스펙 7장).
+// 종목 A — SK텔레콤. 담은 뒤 매수까지 한 케이스(보유중). 저평가 전제는 105,000원 이하로
+// 유지되다가, "3개월 후" 데모에서만 가격이 올라 깨진다 (기술스펙 7장).
 const SEED_A: SeedItem = {
   id: "seed-a",
   ticker: "017670",
   status: "bought",
-  addedPrice: 29_800,
-  addedAt: "2026-05-18T09:00:00+09:00",
-  avgBuyPrice: 30_800,
-  boughtAt: "2026-05-23T09:30:00+09:00",
+  addedPrice: 94_000,
+  addedAt: "2026-07-20T09:00:00+09:00",
+  avgBuyPrice: 96_000,
+  boughtAt: "2026-07-25T09:30:00+09:00",
   quote: {
-    current: { price: 31_200, changePercent: 4.7 },
-    future: { price: 42_000, changePercent: 40.9 },
+    current: { price: 99_600, changePercent: 0.7 },
+    future: { price: 140_000, changePercent: 40.6 },
   },
   thesis: {
     category: "undervalued",
     followup: [
       { questionId: "cheap-vs-what", selected: "peers" },
       { questionId: "metric", selected: "price-itself" },
-      { questionId: "target-price", selected: "custom", freeText: "32000" },
+      { questionId: "target-price", selected: "custom", freeText: "105000" },
     ],
     freeText: "5G 요금제 개편 이후 반등 여지가 있어 보여서 담아요.",
-    createdAt: "2026-05-18T09:04:00+09:00",
+    createdAt: "2026-07-20T09:04:00+09:00",
     critique: {
       isChallengeable: true,
       challengeReason: "'싸다'는 판단이 동종업계 대비일 뿐, 성장 정체 우려는 짚지 않음",
@@ -72,17 +79,18 @@ const SEED_A: SeedItem = {
       {
         base: {
           id: "seed-a-p1",
-          statement: "3만 2,000원 이하일 때 저평가",
+          statement: "10만 5,000원 이하일 때 저평가",
           checkType: "price",
         },
-        current: { status: "intact", observedValue: "31,200원" },
-        future: { status: "broken", observedValue: "42,000원" },
+        current: { status: "intact", observedValue: "99,600원" },
+        future: { status: "broken", observedValue: "140,000원" },
       },
     ],
   },
 };
 
-// 종목 B — 아모레퍼시픽. PER 전제는 깨지고 목표가 전제는 유지, qualitative 전제 1개 혼재.
+// 종목 B — 아모레퍼시픽. PER 전제는 "3개월 후" 데모에서 깨지고 목표가 전제는 계속
+// 유지, qualitative 전제 1개 혼재.
 const SEED_B: SeedItem = {
   id: "seed-b",
   ticker: "090430",
@@ -90,8 +98,8 @@ const SEED_B: SeedItem = {
   addedPrice: 172_000,
   addedAt: "2026-06-18T14:20:00+09:00",
   quote: {
-    current: { price: 186_500, changePercent: 8.4, per: 14.8 },
-    future: { price: 195_800, changePercent: 13.8, per: 21.3 },
+    current: { price: 143_500, changePercent: 0.1, per: 42.1 },
+    future: { price: 195_800, changePercent: 13.8, per: 63.0 },
   },
   thesis: {
     category: "undervalued",
@@ -111,11 +119,11 @@ const SEED_B: SeedItem = {
       {
         base: {
           id: "seed-b-p1",
-          statement: "PER 15배 이하 유지",
+          statement: "PER 44배 이하 유지",
           checkType: "valuation",
         },
-        current: { status: "intact", observedValue: "14.8배" },
-        future: { status: "broken", observedValue: "21.3배" },
+        current: { status: "intact", observedValue: "42.1배" },
+        future: { status: "broken", observedValue: "63.0배" },
       },
       {
         base: {
@@ -123,7 +131,7 @@ const SEED_B: SeedItem = {
           statement: "목표가 210,000원",
           checkType: "price",
         },
-        current: { status: "intact", observedValue: "186,500원" },
+        current: { status: "intact", observedValue: "143,500원" },
         future: { status: "intact", observedValue: "195,800원" },
       },
       {
@@ -141,6 +149,7 @@ const SEED_B: SeedItem = {
 };
 
 // 종목 C — LG에너지솔루션. 근거 없이 담기만 한 케이스. 심사자가 직접 근거를 써볼 대상.
+// 시드 5종 중 유일하게 의도적으로 "근거 없음" 배지를 유지한다.
 const SEED_C: SeedItem = {
   id: "seed-c",
   ticker: "373220",
@@ -148,12 +157,107 @@ const SEED_C: SeedItem = {
   addedPrice: 382_000,
   addedAt: "2026-08-10T11:00:00+09:00",
   quote: {
-    current: { price: 385_000, changePercent: 0.8 },
-    future: { price: 391_500, changePercent: 2.5 },
+    current: { price: 351_000, changePercent: 0.4 },
+    future: { price: 358_000, changePercent: 2.0 },
   },
 };
 
-export const SEED_ITEMS: SeedItem[] = [SEED_A, SEED_B, SEED_C];
+// 종목 D — 삼성전자. 관심종목, 가격 전제 하나만으로 유지 중을 보여주는 단순 케이스.
+const SEED_D: SeedItem = {
+  id: "seed-d",
+  ticker: "005930",
+  status: "watching",
+  addedPrice: 258_000,
+  addedAt: "2026-08-05T10:00:00+09:00",
+  quote: {
+    current: { price: 261_500, changePercent: 1.8, per: 39.8 },
+    future: { price: 300_000, changePercent: 14.7, per: 45.7 },
+  },
+  thesis: {
+    category: "undervalued",
+    followup: [
+      { questionId: "cheap-vs-what", selected: "peers" },
+      { questionId: "metric", selected: "price-itself" },
+      { questionId: "target-price", selected: "custom", freeText: "275000" },
+    ],
+    freeText: "메모리 업사이클 초입이라 보고, 파운드리도 바닥은 지났다고 판단해서 담아요.",
+    createdAt: "2026-08-05T10:05:00+09:00",
+    critique: {
+      isChallengeable: true,
+      challengeReason: "업사이클 시점 판단이 본인 추정일 뿐, 실제 지표(재고·가격 추이)로 뒷받침되지 않음",
+      counterpoints: [
+        {
+          point: "메모리 업사이클 '초입'이라는 판단이 특정 지표 없이 심증에 가까움",
+          severity: "minor",
+          basis: "재고 수준이나 고정가 추이 같은 근거가 followup에 없음",
+        },
+      ],
+      openQuestions: ["다음 분기 메모리 고정가 발표를 확인해보셨나요?"],
+    },
+    premises: [
+      {
+        base: {
+          id: "seed-d-p1",
+          statement: "27만 5,000원 이하일 때 저평가",
+          checkType: "price",
+        },
+        current: { status: "intact", observedValue: "261,500원" },
+        future: { status: "broken", observedValue: "300,000원" },
+      },
+    ],
+  },
+};
+
+// 종목 E — 카카오페이. 보유중, 매수가 대비 이미 수익 구간이라 "좋은 소식"과
+// 저평가 전제 유지가 함께 가는 무난한 케이스.
+const SEED_E: SeedItem = {
+  id: "seed-e",
+  ticker: "377300",
+  status: "bought",
+  addedPrice: 37_000,
+  addedAt: "2026-07-01T09:00:00+09:00",
+  avgBuyPrice: 38_200,
+  boughtAt: "2026-07-03T09:30:00+09:00",
+  quote: {
+    current: { price: 46_300, changePercent: 0.4 },
+    future: { price: 55_000, changePercent: 18.8 },
+  },
+  thesis: {
+    category: "undervalued",
+    followup: [
+      { questionId: "cheap-vs-what", selected: "peers" },
+      { questionId: "metric", selected: "price-itself" },
+      { questionId: "target-price", selected: "custom", freeText: "48500" },
+    ],
+    freeText: "간편결제 점유율이 계속 오르고 있고, 흑자전환 기대감도 있어서 매수했어요.",
+    createdAt: "2026-07-01T09:04:00+09:00",
+    critique: {
+      isChallengeable: true,
+      challengeReason: "흑자전환 '기대감'이 실제 손익분기 시점 추정 없이 막연함",
+      counterpoints: [
+        {
+          point: "흑자전환 시점에 대한 구체적 근거(분기별 적자 축소 추이 등) 없이 기대감만 언급됨",
+          severity: "minor",
+          basis: "followup에 손익 관련 지표가 등장하지 않음",
+        },
+      ],
+      openQuestions: ["최근 분기 영업손실 규모가 줄어드는 추세인지 확인해보셨나요?"],
+    },
+    premises: [
+      {
+        base: {
+          id: "seed-e-p1",
+          statement: "4만 8,500원 이하일 때 저평가",
+          checkType: "price",
+        },
+        current: { status: "intact", observedValue: "46,300원" },
+        future: { status: "broken", observedValue: "55,000원" },
+      },
+    ],
+  },
+};
+
+export const SEED_ITEMS: SeedItem[] = [SEED_A, SEED_B, SEED_C, SEED_D, SEED_E];
 
 function resolvePremise(v: SeedPremiseVariant, isFuture: boolean): Premise {
   const variant = isFuture ? v.future : v.current;

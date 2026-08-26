@@ -7,7 +7,7 @@
 //
 // 개별 종목 실패(존재하지 않는 티커, KIS 오류 등)가 나머지 종목 조회를 막지 않도록
 // Promise.allSettled로 격리하고, 종목별 성공/실패를 티커로 바로 조회 가능한 Map으로
-// 반환한다. 워치리스트 규모(시드 A/B/C 기준 수 종목)에서는 동시성 제한이 필요 없다.
+// 반환한다. 워치리스트 규모(시드 A/B/C/D/E 기준 수 종목)에서는 동시성 제한이 필요 없다.
 
 import "server-only";
 import { getKoreanStockPrice } from "./quote-client";
