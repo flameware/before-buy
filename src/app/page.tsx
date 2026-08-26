@@ -1,23 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
-import {
-  badgeLabel,
-  badgeState,
-  changedCount,
-  initialWatchlist,
-  quoteFor,
-  splitByStatus,
-  stockFor,
-  type BadgeState,
-  type WatchlistItem,
-} from "@/lib/mock";
+import { badgeLabel, badgeState, changedCount, splitByStatus, type BadgeState } from "@/lib/mock";
+import { loadWatchlist } from "./actions";
+import type { WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
 
 const priceFormat = new Intl.NumberFormat("ko-KR");
 
@@ -53,17 +45,14 @@ function HighlightParam({ onHighlight }: { onHighlight: (ticker: string | null) 
 
 function StockCard({
   item,
-  isFuture,
   highlighted,
 }: {
-  item: WatchlistItem;
-  isFuture: boolean;
+  item: WatchlistViewItem;
   highlighted?: boolean;
 }) {
   const router = useRouter();
-  const stock = stockFor(item);
-  const quote = quoteFor(item, isFuture);
   const state = badgeState(item);
+  const quote = item.quote;
 
   return (
     <div
@@ -80,25 +69,31 @@ function StockCard({
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center gap-1.5">
-          <span className="truncate font-medium">{stock.name}</span>
-          <span className="shrink-0 text-xs text-muted-foreground">{stock.ticker}</span>
+          <span className="truncate font-medium">{item.name}</span>
+          <span className="shrink-0 text-xs text-muted-foreground">{item.ticker}</span>
         </div>
         <Badge variant={badgeVariant(state)}>{badgeLabel(state)}</Badge>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
-        <span className="text-sm font-medium tabular-nums">{formatPrice(quote.price)}</span>
-        <span
-          className={
-            "text-xs tabular-nums " +
-            (quote.changePercent > 0
-              ? "text-red-500"
-              : quote.changePercent < 0
-                ? "text-blue-500"
-                : "text-muted-foreground")
-          }
-        >
-          {formatChange(quote.changePercent)}
-        </span>
+        {quote ? (
+          <>
+            <span className="text-sm font-medium tabular-nums">{formatPrice(quote.price)}</span>
+            <span
+              className={
+                "text-xs tabular-nums " +
+                (quote.changePercent > 0
+                  ? "text-red-500"
+                  : quote.changePercent < 0
+                    ? "text-blue-500"
+                    : "text-muted-foreground")
+              }
+            >
+              {formatChange(quote.changePercent)}
+            </span>
+          </>
+        ) : (
+          <span className="text-xs text-muted-foreground">시세 조회 실패</span>
+        )}
       </div>
       {item.status === "watching" ? (
         <Button
@@ -118,10 +113,28 @@ function StockCard({
 export default function Home() {
   const router = useRouter();
   const { isFuture, toggle, hydrated } = useDemoScenario();
-  const watchlist = useMemo(() => initialWatchlist(isFuture), [isFuture]);
+  const [watchlist, setWatchlist] = useState<WatchlistViewItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [highlightTicker, setHighlightTicker] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    loadWatchlist(isFuture).then((items) => {
+      if (!cancelled) {
+        setWatchlist(items);
+        setLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, isFuture]);
+
   const { watching, bought } = splitByStatus(watchlist);
   const numChanged = changedCount(watchlist);
-  const [highlightTicker, setHighlightTicker] = useState<string | null>(null);
 
   useEffect(() => {
     if (!highlightTicker) return;
@@ -163,13 +176,16 @@ export default function Home() {
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold text-muted-foreground">관심종목</h2>
-          {watching.length > 0 ? (
+          {loading ? (
+            <p className="rounded-2xl bg-muted px-4 py-6 text-center text-sm text-muted-foreground">
+              불러오는 중...
+            </p>
+          ) : watching.length > 0 ? (
             <div className="flex flex-col gap-2">
               {watching.map((item) => (
                 <StockCard
                   key={item.id}
                   item={item}
-                  isFuture={isFuture}
                   highlighted={item.ticker === highlightTicker}
                 />
               ))}
@@ -191,7 +207,7 @@ export default function Home() {
             <h2 className="text-sm font-semibold text-muted-foreground">보유중</h2>
             <div className="flex flex-col gap-2">
               {bought.map((item) => (
-                <StockCard key={item.id} item={item} isFuture={isFuture} />
+                <StockCard key={item.id} item={item} />
               ))}
             </div>
           </section>

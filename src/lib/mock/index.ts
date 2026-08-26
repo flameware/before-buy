@@ -55,7 +55,7 @@ export function initialWatchlist(isFuture: boolean): WatchlistItem[] {
   ];
 }
 
-export function splitByStatus(items: WatchlistItem[]) {
+export function splitByStatus<T extends WatchlistItem>(items: T[]) {
   return {
     watching: items.filter((i) => i.status === "watching"),
     bought: items.filter((i) => i.status === "bought"),
