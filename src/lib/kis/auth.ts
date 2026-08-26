@@ -25,6 +25,7 @@ export class KISAuthService {
   private appSecret: string;
   private token: KISTokenResponse | null = null;
   private tokenExpiresAt: Date | null = null;
+  private pendingTokenRequest: Promise<void> | null = null;
 
   constructor(options: { baseUrl: string; appKey: string; appSecret: string; label: string }) {
     this.baseUrl = options.baseUrl;
@@ -40,7 +41,17 @@ export class KISAuthService {
     if (this.token && this.tokenExpiresAt && new Date() < this.tokenExpiresAt) {
       return this.token.access_token;
     }
-    await this.requestNewToken(config);
+
+    // getKoreanStockPrices()가 티커별로 이 메서드를 동시에 호출한다 — 캐시가 비어
+    // 있을 때 각 호출이 독립적으로 requestNewToken을 트리거하면 한 번의 배치 조회로
+    // KIS 토큰 발급 엔드포인트가 N번 불린다. 진행 중인 요청을 공유해 한 번만 나가게 한다.
+    if (!this.pendingTokenRequest) {
+      this.pendingTokenRequest = this.requestNewToken(config).finally(() => {
+        this.pendingTokenRequest = null;
+      });
+    }
+    await this.pendingTokenRequest;
+
     if (!this.token) {
       throw new Error("Failed to obtain access token");
     }

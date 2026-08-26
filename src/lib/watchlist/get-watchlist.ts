@@ -54,7 +54,7 @@ export async function getWatchlistView(isFuture: boolean): Promise<WatchlistView
   });
 }
 
-async function fetchLatestTheses(watchlistItemIds: string[]): Promise<Map<string, Thesis>> {
+export async function fetchLatestTheses(watchlistItemIds: string[]): Promise<Map<string, Thesis>> {
   const thesisRows = await db
     .select()
     .from(theses)
@@ -114,7 +114,7 @@ async function fetchLatestTheses(watchlistItemIds: string[]): Promise<Map<string
  * 배치 조회 결과를 쓴다. "3개월 후" 토글일 때만 시드 종목에 한해 데모 오프셋에 맞는
  * fixture 시세를 참조한다. 개별 종목 조회 실패는 `null`로 표시해 화면이 폴백을 그리게 한다.
  */
-async function resolveQuotes(
+export async function resolveQuotes(
   items: { ticker: string; isSeed: boolean }[],
   isFuture: boolean
 ): Promise<Map<string, QuoteSnapshot | null>> {

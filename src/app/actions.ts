@@ -5,6 +5,8 @@ import { generateThesisResult, type GenerateThesisResultOutcome, type ThesisDraf
 import { getExistingThesis } from "@/lib/thesis/get-existing-thesis";
 import type { CritiqueOutput } from "@/lib/llm/types";
 import { getWatchlistView, type WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
+import { getWatchlistItemForOrder } from "@/lib/watchlist/get-watchlist-item";
+import { recordOrderEvent, type OrderEventInput } from "@/lib/order/record-order-event";
 import type { QuoteSnapshot, Thesis } from "@/lib/mock/types";
 
 /** S1이 클라이언트에서 "3개월 후" 토글이 바뀔 때마다 호출하는 Server Action. */
@@ -33,4 +35,17 @@ export async function commitThesisAction(
   quote: QuoteSnapshot
 ): Promise<void> {
   return commitThesis(ticker, draft, critique, quote);
+}
+
+/** S4 진입: 세션 소유 관심종목을 ticker로 조회한다. 판정은 돌리지 않고 읽기만 한다. */
+export async function getOrderConfirmItemAction(
+  ticker: string,
+  isFuture: boolean
+): Promise<WatchlistViewItem | null> {
+  return getWatchlistItemForOrder(ticker, isFuture);
+}
+
+/** S4 취소/구매/시트닫기/근거갱신 4개 분기 모두에서 호출: order_events 1건을 남긴다. */
+export async function recordOrderEventAction(input: OrderEventInput): Promise<void> {
+  return recordOrderEvent(input);
 }
