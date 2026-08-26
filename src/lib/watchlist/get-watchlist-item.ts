@@ -1,4 +1,4 @@
-// S4 주문 전 확인의 실 데이터 조회 (지도 #38 destination). getWatchlistView(S1)와 달리
+// S4 주문 전 확인의 실 데이터 조회 (지도 #38 destination). getWatchlistListView(S1)와 달리
 // evaluateWatchlistPremises를 돌리지 않는다 — S4는 전제를 "판정"하지 않고 마지막으로
 // 판정된 premises.status를 그대로 "읽기"만 한다 (판정 트리거는 S1 로드/S5 진입뿐).
 

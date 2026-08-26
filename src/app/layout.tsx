@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { PhoneFrame } from "@/components/layout/phone-frame";
+import { QueryProvider } from "@/components/providers/query-provider";
 
 const geistHeading = Geist({subsets:['latin'],variable:'--font-heading'});
 
@@ -30,7 +31,9 @@ export default function RootLayout({ children, modal }: LayoutProps<"/">) {
       className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", inter.variable, geistHeading.variable)}
     >
       <body className="min-h-full flex flex-col">
-        <PhoneFrame modal={modal}>{children}</PhoneFrame>
+        <QueryProvider>
+          <PhoneFrame modal={modal}>{children}</PhoneFrame>
+        </QueryProvider>
       </body>
     </html>
   );

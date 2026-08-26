@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ type LoadState =
 
 export function ThesisResultView({ ticker, stockName }: { ticker: string; stockName: string }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [committing, setCommitting] = useState(false);
   const generatingRef = useRef(false);
@@ -159,6 +161,8 @@ export function ThesisResultView({ ticker, stockName }: { ticker: string; stockN
       state.critique,
       state.quote
     );
+    // ADR-0002: 새 종목이 담겼으니 S1 목록 캐시를 무효화해 복귀 시 바로 반영되게 한다.
+    await queryClient.invalidateQueries({ queryKey: ["watchlist", "list"] });
     router.push(`/?highlight=${ticker}`);
   }
 

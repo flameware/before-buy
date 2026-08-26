@@ -4,14 +4,22 @@ import { commitThesis } from "@/lib/thesis/commit-thesis";
 import { generateThesisResult, type GenerateThesisResultOutcome, type ThesisDraftInput } from "@/lib/thesis/generate-result";
 import { getExistingThesis } from "@/lib/thesis/get-existing-thesis";
 import type { CritiqueOutput } from "@/lib/llm/types";
-import { getWatchlistView, type WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
+import { getWatchlistListView, getWatchlistQuoteMap, type WatchlistListItem, type WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
 import { getWatchlistItemDetail, getWatchlistItemForOrder, removeWatchlistItem } from "@/lib/watchlist/get-watchlist-item";
 import { recordOrderEvent, type OrderEventInput } from "@/lib/order/record-order-event";
 import type { QuoteSnapshot, Thesis } from "@/lib/mock/types";
 
-/** S1이 클라이언트에서 "3개월 후" 토글이 바뀔 때마다 호출하는 Server Action. */
-export async function loadWatchlist(isFuture: boolean): Promise<WatchlistViewItem[]> {
-  return getWatchlistView(isFuture);
+/** S1 목록 쿼리(React Query)가 호출하는 Server Action. 시세는 포함하지 않는다 (ADR-0002). */
+export async function loadWatchlistList(isFuture: boolean): Promise<WatchlistListItem[]> {
+  return getWatchlistListView(isFuture);
+}
+
+/** S1 시세 쿼리(React Query)가 목록 로드 후 호출하는 Server Action. */
+export async function loadWatchlistQuotes(
+  items: { ticker: string; isSeed: boolean }[],
+  isFuture: boolean
+): Promise<Record<string, QuoteSnapshot | null>> {
+  return getWatchlistQuoteMap(items, isFuture);
 }
 
 /** S3 진입 시 1회: S2 draft에 실 시세를 붙여 LLM(critique+전제)을 생성한다. */

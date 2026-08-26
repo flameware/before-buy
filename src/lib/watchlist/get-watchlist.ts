@@ -1,6 +1,10 @@
 // S1 관심종목 목록의 실 데이터 조회 (지도 #38 destination). 세션 소유 watchlist_items를
 // DB에서 읽고, 전제 판정 엔진을 먼저 돌려 최신 상태로 만든 뒤, 시세(시드는 fixture,
 // 그 외는 KIS 배치 조회)를 붙여 반환한다. Server Action(actions.ts)이 이 함수를 감싼다.
+//
+// ADR-0002: 목록(DB: 종목/근거/전제)과 시세(KIS)는 클라이언트에서 서로 다른 캐시
+// 수명으로 다뤄야 해서 두 개의 독립된 조회로 분리했다 — getWatchlistListView가
+// 목록을, resolveQuotes(quote 부분만 필요한 곳에서 별도 호출)가 시세를 맡는다.
 
 import "server-only";
 import { and, desc, eq, inArray } from "drizzle-orm";
@@ -18,8 +22,11 @@ export interface WatchlistViewItem extends WatchlistItem {
   quote: QuoteSnapshot | null;
 }
 
-/** S1 목록: 화면에 보이는(watching/bought) 종목만 실 데이터로 조회한다. */
-export async function getWatchlistView(isFuture: boolean): Promise<WatchlistViewItem[]> {
+/** 시세를 아직 붙이지 않은 목록 항목 — S1이 목록 쿼리와 시세 쿼리를 분리 캐싱하는 데 쓴다. */
+export type WatchlistListItem = Omit<WatchlistViewItem, "quote">;
+
+/** S1 목록(DB 부분만): 화면에 보이는(watching/bought) 종목의 근거/전제 상태를 조회한다. 시세는 포함하지 않는다. */
+export async function getWatchlistListView(isFuture: boolean): Promise<WatchlistListItem[]> {
   return withSession(async (sessionId) => {
     await evaluateWatchlistPremises(sessionId, isFuture);
 
@@ -32,11 +39,9 @@ export async function getWatchlistView(isFuture: boolean): Promise<WatchlistView
     if (items.length === 0) return [];
 
     const theseByItem = await fetchLatestTheses(items.map((i) => i.id));
-    const quotes = await resolveQuotes(items, isFuture);
 
     return items.map((item) => {
       const thesis = theseByItem.get(item.id);
-      const quote = quotes.get(item.ticker) ?? null;
       return {
         id: item.id,
         ticker: item.ticker,
@@ -48,10 +53,18 @@ export async function getWatchlistView(isFuture: boolean): Promise<WatchlistView
         avgBuyPrice: item.avgBuyPrice != null ? Number(item.avgBuyPrice) : undefined,
         boughtAt: item.boughtAt?.toISOString(),
         thesis,
-        quote,
       };
     });
   });
+}
+
+/** S1 시세: 목록 쿼리가 돌려준 티커들의 시세만 별도로 조회한다. Map은 서버 액션 경계를 넘기 어려워 객체로 반환한다. */
+export async function getWatchlistQuoteMap(
+  items: { ticker: string; isSeed: boolean }[],
+  isFuture: boolean
+): Promise<Record<string, QuoteSnapshot | null>> {
+  const quotes = await resolveQuotes(items, isFuture);
+  return Object.fromEntries(quotes);
 }
 
 export async function fetchLatestTheses(watchlistItemIds: string[]): Promise<Map<string, Thesis>> {
