@@ -1,5 +1,6 @@
 "use client";
 
+import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -58,12 +59,16 @@ export default function SearchPage() {
     <>
       <ScreenHeader title="종목 검색" />
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
-        <Input
-          autoFocus
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="종목 이름이나 코드"
-        />
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="종목 이름이나 코드"
+            className="pl-9"
+          />
+        </div>
 
         {isSearching ? (
           <section className="flex flex-col gap-2">
