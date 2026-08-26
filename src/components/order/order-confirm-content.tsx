@@ -85,7 +85,32 @@ export function OrderConfirmContent({
     router.push(`/thesis/${ticker}`);
   }
 
-  if (state.status !== "ready") {
+  if (state.status === "not-found") {
+    // 세션의 관심종목이 아닌 티커(제거됐거나 애초에 담은 적 없음)로 접근한 경우.
+    // order_events를 남길 watchlist_item_id가 없어 여기서 더 진행할 수 없다.
+    const message = (
+      <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
+        관심종목에서 찾을 수 없는 종목이에요.
+      </div>
+    );
+    return variant === "modal" ? (
+      <Drawer open onOpenChange={(open) => !open && router.back()} showSwipeHandle>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>주문 전 확인</DrawerTitle>
+          </DrawerHeader>
+          {message}
+        </DrawerContent>
+      </Drawer>
+    ) : (
+      <>
+        <ScreenHeader title="주문 전 확인" />
+        {message}
+      </>
+    );
+  }
+
+  if (state.status === "loading") {
     return variant === "modal" ? (
       <Drawer open onOpenChange={(open) => !open && router.back()} showSwipeHandle>
         <DrawerContent>
