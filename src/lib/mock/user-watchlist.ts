@@ -6,10 +6,21 @@ import type { WatchlistItem } from "./types";
  */
 const userItems: WatchlistItem[] = [];
 
+/** S5 "관심종목에서 제외" — 시각적 반영만(Notes: 실제 기록 없음), id로 목록에서 숨김. */
+const removedIds = new Set<string>();
+
 export function addUserWatchlistItem(item: WatchlistItem): void {
   userItems.push(item);
 }
 
 export function getUserWatchlistItems(): WatchlistItem[] {
-  return userItems;
+  return userItems.filter((item) => !removedIds.has(item.id));
+}
+
+export function removeWatchlistItem(id: string): void {
+  removedIds.add(id);
+}
+
+export function isWatchlistItemRemoved(id: string): boolean {
+  return removedIds.has(id);
 }

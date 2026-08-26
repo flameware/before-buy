@@ -1,13 +1,13 @@
 import { findStock, STATIC_QUOTES } from "./stock-universe";
 import { resolveSeedItems, resolveSeedQuote } from "./seed-data";
-import { getUserWatchlistItems } from "./user-watchlist";
+import { getUserWatchlistItems, isWatchlistItemRemoved } from "./user-watchlist";
 import type { BadgeState, QuoteSnapshot, Stock, WatchlistItem } from "./types";
 
 export * from "./types";
 export * from "./categories";
 export { STOCK_UNIVERSE, POPULAR_TICKERS, findStock, searchStocks } from "./stock-universe";
 export { setThesisDraft, getThesisDraft, type ThesisDraft } from "./thesis-draft";
-export { addUserWatchlistItem } from "./user-watchlist";
+export { addUserWatchlistItem, removeWatchlistItem } from "./user-watchlist";
 export { generateCritique, generatePremises } from "./critique";
 
 /** 근거 없음 / 유지 중 / 달라짐. CONTEXT.md "배지 상태" — 정확히 이 3개뿐. */
@@ -49,7 +49,10 @@ export function stockFor(item: Pick<WatchlistItem, "ticker">): Stock {
  * (Notes: "S2에서 담은 종목은 새로고침 시 휘발되어도 무방").
  */
 export function initialWatchlist(isFuture: boolean): WatchlistItem[] {
-  return [...resolveSeedItems(isFuture), ...getUserWatchlistItems()];
+  return [
+    ...resolveSeedItems(isFuture).filter((item) => !isWatchlistItemRemoved(item.id)),
+    ...getUserWatchlistItems(),
+  ];
 }
 
 export function splitByStatus(items: WatchlistItem[]) {
