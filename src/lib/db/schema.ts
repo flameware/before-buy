@@ -15,6 +15,7 @@ export const sessions = pgTable("sessions", {
     .notNull()
     .defaultNow(),
   demoOffsetDays: integer("demo_offset_days").notNull().default(0),
+  llmCallCount: integer("llm_call_count").notNull().default(0),
 });
 
 export const watchlistItems = pgTable("watchlist_items", {
