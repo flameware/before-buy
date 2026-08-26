@@ -2,6 +2,7 @@ import {
   boolean,
   integer,
   jsonb,
+  numeric,
   pgTable,
   text,
   timestamp,
@@ -24,6 +25,10 @@ export const watchlistItems = pgTable("watchlist_items", {
   ticker: text("ticker").notNull(),
   name: text("name").notNull(),
   status: text("status").notNull(), // watching | bought | removed
+  addedPrice: numeric("added_price"), // 담은 시점 가격 (근거 유효성 기준)
+  addedAt: timestamp("added_at", { withTimezone: true }),
+  avgBuyPrice: numeric("avg_buy_price"), // 매수 단가 (손익 기준). status=bought일 때만
+  boughtAt: timestamp("bought_at", { withTimezone: true }),
   isSeed: boolean("is_seed").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
