@@ -18,5 +18,6 @@ export const tradeAuth = new KISAuthService({
   baseUrl: process.env.KIS_BASE_URL || KIS_DEMO_BASE_URL,
   appKey: process.env.KIS_MOCK_APPKEY || "",
   appSecret: process.env.KIS_MOCK_APPSECRET || "",
+  tokenKey: "trade",
   label: "trade-client (모의 주문/잔고)",
 });

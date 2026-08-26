@@ -23,6 +23,7 @@ const quoteAuth = new KISAuthService({
   baseUrl: KIS_REAL_BASE_URL,
   appKey: process.env.KIS_REAL_APPKEY_READONLY || "",
   appSecret: process.env.KIS_REAL_APPSECRET_READONLY || "",
+  tokenKey: "quote",
   label: "quote-client (실전 조회 전용)",
 });
 
