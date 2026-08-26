@@ -48,9 +48,13 @@ function StockCard({ item, isFuture }: { item: WatchlistItem; isFuture: boolean 
   const state = badgeState(item);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => router.push(`/stocks/${item.ticker}`)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") router.push(`/stocks/${item.ticker}`);
+      }}
       className="flex w-full items-center gap-3 rounded-2xl bg-card px-4 py-3 text-left ring-1 ring-foreground/10"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -86,7 +90,7 @@ function StockCard({ item, isFuture }: { item: WatchlistItem; isFuture: boolean 
           구매
         </Button>
       ) : null}
-    </button>
+    </div>
   );
 }
 
