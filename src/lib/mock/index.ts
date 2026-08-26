@@ -5,6 +5,7 @@ import type { BadgeState, QuoteSnapshot, Stock, WatchlistItem } from "./types";
 export * from "./types";
 export * from "./categories";
 export { STOCK_UNIVERSE, POPULAR_TICKERS, findStock, searchStocks } from "./stock-universe";
+export { setThesisDraft, getThesisDraft, type ThesisDraft } from "./thesis-draft";
 
 /** 근거 없음 / 유지 중 / 달라짐. CONTEXT.md "배지 상태" — 정확히 이 3개뿐. */
 export function badgeState(item: WatchlistItem): BadgeState {
