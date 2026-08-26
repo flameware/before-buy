@@ -1,0 +1,1 @@
+ALTER TABLE "sessions" ADD COLUMN "llm_call_count" integer DEFAULT 0 NOT NULL;

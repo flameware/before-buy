@@ -15,6 +15,13 @@
       "when": 1787722848659,
       "tag": "0001_freezing_khan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787727424738,
+      "tag": "0002_chunky_old_lace",
+      "breakpoints": true
     }
   ]
 }
