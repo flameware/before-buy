@@ -26,10 +26,16 @@ const LOADING_STAGE_MESSAGES = [
 // 체감 대기시간을 줄이려고 경과 시간 기준으로만 문구를 바꾼다 — 실제 단계와는 무관하다.
 function useLoadingStageMessage(active: boolean): string {
   const [stage, setStage] = useState(0);
+  const [prevActive, setPrevActive] = useState(active);
+
+  // active가 다시 켜질 때(= `다시 시도`) 문구를 처음부터 돌린다.
+  if (active !== prevActive) {
+    setPrevActive(active);
+    if (active) setStage(0);
+  }
 
   useEffect(() => {
     if (!active) return;
-    setStage(0);
     const timers = [
       setTimeout(() => setStage(1), 7000),
       setTimeout(() => setStage(2), 18000),
