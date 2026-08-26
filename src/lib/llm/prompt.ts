@@ -4,7 +4,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ThesisCategory } from "@/lib/mock/types";
 import type { CritiqueInput } from "./types";
-import { CRITIQUE_TOOL_NAME } from "./tool";
 
 const BASE_SYSTEM_PROMPT = `당신은 개인 투자자가 직접 쓴 투자 근거를 검토하는 도우미입니다.
 사용자가 어떤 종목을 관심종목에 담으면서 "왜 담는지"를 적었고,
@@ -129,15 +128,16 @@ ${CATEGORY_BLOCKS[category]}`;
 }
 
 /**
- * few-shot 예시 두 벌 — 강제 tool-call과 동일한 포맷(user 메시지 + assistant의
- * tool_use 블록)으로 구성해, 모델이 실제로 내야 할 응답 형태와 예시 형태를 일치시킨다.
- * (프롬프트 명세.md 4장의 예시 A/B를 tool_use로 변환한 것.)
+ * few-shot 예시 두 벌 — 구조화 출력과 동일한 포맷(user 메시지 + assistant의 JSON 응답)으로
+ * 구성해, 모델이 실제로 내야 할 응답 형태와 예시 형태를 일치시킨다.
+ * (프롬프트 명세.md 4장의 예시 A/B.)
+ *
+ * 이슈 #58: 예전에는 강제 tool-call이라 예시도 tool_use 블록이었다. 구조화 출력으로
+ * 바꾸면서 assistant 턴을 그냥 JSON 텍스트로 되돌렸다 — tool_use 블록은 tools를
+ * 선언하지 않은 요청에서는 쓸 수 없다.
  */
-function toolResult(toolUseId: string): Anthropic.MessageParam {
-  return {
-    role: "user",
-    content: [{ type: "tool_result", tool_use_id: toolUseId, content: "접수했습니다." }],
-  };
+function assistantExample(output: unknown): Anthropic.MessageParam {
+  return { role: "assistant", content: JSON.stringify(output) };
 }
 
 export function buildFewShotMessages(): Anthropic.MessageParam[] {
@@ -159,54 +159,43 @@ export function buildFewShotMessages(): Anthropic.MessageParam[] {
 
 현재 지표: 현재가 1,678,000원 / PER 7.53 / PBR 4.56`,
     },
-    {
-      role: "assistant",
-      content: [
+    assistantExample({
+      is_challengeable: true,
+      challenge_reason: "PER만 보고 싸다고 판단하셨는데, 순자산 대비로는 오히려 비싼 편입니다",
+      counterpoints: [
         {
-          type: "tool_use",
-          id: "fewshot_a",
-          name: CRITIQUE_TOOL_NAME,
-          input: {
-            is_challengeable: true,
-            challenge_reason: "PER만 보고 싸다고 판단하셨는데, 순자산 대비로는 오히려 비싼 편입니다",
-            counterpoints: [
-              {
-                point: "PER은 7.53배로 낮은데 PBR은 4.56배로 높습니다. 두 숫자가 다른 이야기를 하고 있어요.",
-                severity: "major",
-                basis: "이런 조합은 지금 벌어들이는 이익이 유난히 좋을 때 나타납니다. 이익이 줄면 PER은 빠르게 올라가지만 PBR은 그대로라, 지금 싸 보이는 것이 계속 싼 게 아닐 수 있습니다.",
-              },
-              {
-                point: "동종업계 대비 싸다고 하셨는데, 어느 회사들과 비교하신 건가요?",
-                severity: "major",
-                basis: "반도체 안에서도 메모리와 파운드리, 장비의 PER 수준이 크게 다릅니다. 비교 대상에 따라 7.53배가 싼지 아닌지가 달라집니다.",
-              },
-              {
-                point: "목표가 2,000,000원은 어떻게 나온 숫자인가요?",
-                severity: "minor",
-                basis: "지금보다 약 19% 높은 가격인데, 이익이 더 늘어서인지 시장이 더 높은 PER을 줘서인지에 따라 확인할 것이 달라집니다.",
-              },
-            ],
-            open_questions: [
-              "비교하신 회사들의 지금 PER은 몇 배인가요?",
-              "이익이 지금보다 줄어든다면 그때도 계속 들고 계실 건가요?",
-            ],
-            premises: [
-              {
-                statement: "PER 10배 아래를 유지한다",
-                check_type: "valuation",
-                check_config: { metric: "per", operator: "lte", value: 10 },
-              },
-              {
-                statement: "2,000,000원까지 오른다",
-                check_type: "price",
-                check_config: { operator: "gte", value: 2000000 },
-              },
-            ],
-          },
+          point: "PER은 7.53배로 낮은데 PBR은 4.56배로 높습니다. 두 숫자가 다른 이야기를 하고 있어요.",
+          severity: "major",
+          basis: "이런 조합은 지금 벌어들이는 이익이 유난히 좋을 때 나타납니다. 이익이 줄면 PER은 빠르게 올라가지만 PBR은 그대로라, 지금 싸 보이는 것이 계속 싼 게 아닐 수 있습니다.",
+        },
+        {
+          point: "동종업계 대비 싸다고 하셨는데, 어느 회사들과 비교하신 건가요?",
+          severity: "major",
+          basis: "반도체 안에서도 메모리와 파운드리, 장비의 PER 수준이 크게 다릅니다. 비교 대상에 따라 7.53배가 싼지 아닌지가 달라집니다.",
+        },
+        {
+          point: "목표가 2,000,000원은 어떻게 나온 숫자인가요?",
+          severity: "minor",
+          basis: "지금보다 약 19% 높은 가격인데, 이익이 더 늘어서인지 시장이 더 높은 PER을 줘서인지에 따라 확인할 것이 달라집니다.",
         },
       ],
-    },
-    toolResult("fewshot_a"),
+      open_questions: [
+        "비교하신 회사들의 지금 PER은 몇 배인가요?",
+        "이익이 지금보다 줄어든다면 그때도 계속 들고 계실 건가요?",
+      ],
+      premises: [
+        {
+          statement: "PER 10배 아래를 유지한다",
+          check_type: "valuation",
+          check_config: { metric: "per", operator: "lte", value: 10, period: null },
+        },
+        {
+          statement: "2,000,000원까지 오른다",
+          check_type: "price",
+          check_config: { metric: null, operator: "gte", value: 2000000, period: null },
+        },
+      ],
+    }),
     {
       role: "user",
       content: `종목: 삼성전자 (반도체)
@@ -224,34 +213,23 @@ export function buildFewShotMessages(): Anthropic.MessageParam[] {
 
 현재 지표: 현재가 261,500원 / PER 11.73 / PBR 3.04`,
     },
-    {
-      role: "assistant",
-      content: [
+    assistantExample({
+      is_challengeable: false,
+      challenge_reason: "들어갈 자리와 나올 자리를 모두 정해두셨습니다",
+      counterpoints: [],
+      open_questions: ["240,000원이 깨졌다가 다시 올라오면 어떻게 하실 건가요?"],
+      premises: [
         {
-          type: "tool_use",
-          id: "fewshot_b",
-          name: CRITIQUE_TOOL_NAME,
-          input: {
-            is_challengeable: false,
-            challenge_reason: "들어갈 자리와 나올 자리를 모두 정해두셨습니다",
-            counterpoints: [],
-            open_questions: ["240,000원이 깨졌다가 다시 올라오면 어떻게 하실 건가요?"],
-            premises: [
-              {
-                statement: "240,000원 아래로 내려가지 않는다",
-                check_type: "price",
-                check_config: { operator: "gte", value: 240000 },
-              },
-              {
-                statement: "300,000원까지 오른다",
-                check_type: "price",
-                check_config: { operator: "gte", value: 300000 },
-              },
-            ],
-          },
+          statement: "240,000원 아래로 내려가지 않는다",
+          check_type: "price",
+          check_config: { metric: null, operator: "gte", value: 240000, period: null },
+        },
+        {
+          statement: "300,000원까지 오른다",
+          check_type: "price",
+          check_config: { metric: null, operator: "gte", value: 300000, period: null },
         },
       ],
-    },
-    toolResult("fewshot_b"),
+    }),
   ];
 }

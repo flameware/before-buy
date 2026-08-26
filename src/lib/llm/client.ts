@@ -6,7 +6,10 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 
-const TIMEOUT_MS = 30_000;
+// 이슈 #58: 30초로는 빠듯하다. 현행 모델은 thinking이 기본으로 켜져 있어 실측 호출이
+// 30초를 넘기는 경우가 있었다. 타임아웃도 SDK maxRetries의 재시도 대상이라
+// 최악의 경우 대기 시간은 이 값의 (maxRetries+1)배가 된다.
+const TIMEOUT_MS = 60_000;
 
 let client: Anthropic | null = null;
 
