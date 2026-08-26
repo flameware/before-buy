@@ -36,6 +36,13 @@
       "when": 1787760234524,
       "tag": "0004_freezing_menace",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787760523426,
+      "tag": "0005_bent_zarda",
+      "breakpoints": true
     }
   ]
 }

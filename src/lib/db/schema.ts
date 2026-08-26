@@ -14,7 +14,7 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-  demoOffsetDays: integer("demo_offset_days").notNull().default(0),
+  // ADR-0004: 데모 시점은 서버가 기억하지 않는다 — 클라이언트가 조회 인자로 넘긴다.
   llmCallCount: integer("llm_call_count").notNull().default(0),
 });
 

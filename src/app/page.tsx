@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -118,7 +118,6 @@ function StockCard({
 
 export default function Home() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const { scenario, toggle, hydrated } = useDemoScenario();
   const [highlightTicker, setHighlightTicker] = useState<string | null>(null);
 
@@ -141,20 +140,14 @@ export default function Home() {
     .sort()
     .join(",");
 
+  // 데모 시점에 의존하는 것은 이 쿼리뿐이고 그 뒤에 공유 상태가 없으므로, 시점을 키에
+  // 넣어 시나리오별 캐시 엔트리로 자연 분리한다 — 명시적 무효화가 필요 없다(ADR-0004).
   const quotesQuery = useQuery({
-    queryKey: ["watchlist", "quotes", tickerKey],
+    queryKey: ["watchlist", "quotes", scenario, tickerKey],
     queryFn: () => loadWatchlistQuotes(quoteTargets, scenario),
     enabled: hydrated && quoteTargets.length > 0,
     staleTime: QUOTES_STALE_TIME_MS,
   });
-
-  // ADR-0004: 데모 시점은 캐시 키가 아니라 명시적 무효화로 다룬다. 시점이 바뀐 뒤의
-  // 렌더에서 무효화해야 queryFn이 새 시점을 닫아 잡는다 — 토글 핸들러 안에서 부르면
-  // 직전 시점으로 재조회될 수 있다.
-  useEffect(() => {
-    if (!hydrated) return;
-    void queryClient.invalidateQueries({ queryKey: ["watchlist", "quotes"] });
-  }, [scenario, hydrated, queryClient]);
 
   // 배지는 화면에 그리는 바로 그 시세에서 나온다. 가격만 미래로 바뀌고 배지가 과거에
   // 남는 일이 구조적으로 불가능해진다(ADR-0004).
