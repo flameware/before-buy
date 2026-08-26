@@ -1,57 +1,107 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScreenHeader } from "@/components/layout/screen-header";
-import {
-  addUserWatchlistItem,
-  generateCritique,
-  generatePremises,
-  getThesisDraft,
-  initialWatchlist,
-  quoteFor,
-  type CheckType,
-  type Thesis,
-} from "@/lib/mock";
+import { commitThesisAction, generateThesisResultAction, getExistingThesisAction } from "@/app/actions";
+import { getThesisDraft } from "@/lib/mock";
+import type { CheckType, QuoteSnapshot, Thesis } from "@/lib/mock/types";
+import type { CritiqueOutput } from "@/lib/llm/types";
+import type { GenerateThesisResultOutcome } from "@/lib/thesis/generate-result";
 
 function isAutoCheck(checkType: CheckType): boolean {
   return checkType === "price" || checkType === "valuation";
 }
 
+function critiqueOutputToThesis(
+  category: Thesis["category"],
+  followup: Thesis["followup"],
+  freeText: string | undefined,
+  createdAt: string,
+  critique: CritiqueOutput
+): Thesis {
+  return {
+    category,
+    followup,
+    freeText,
+    createdAt,
+    critique: {
+      isChallengeable: critique.isChallengeable,
+      challengeReason: critique.challengeReason,
+      counterpoints: critique.counterpoints,
+      openQuestions: critique.openQuestions,
+    },
+    premises: critique.premises.map((p, i) => ({
+      id: `pending-${i}`,
+      statement: p.statement,
+      checkType: p.checkType,
+      status: isAutoCheck(p.checkType) ? "pending" : "manual",
+    })),
+  };
+}
+
+type LoadState =
+  | { status: "loading" }
+  | { status: "no-draft" }
+  | { status: "error"; reason: "quote-unavailable" | "llm-call-limit-exceeded" | "llm-error" }
+  | { status: "ready-existing"; thesis: Thesis }
+  | { status: "ready-new"; thesis: Thesis; quote: QuoteSnapshot; critique: CritiqueOutput };
+
 export function ThesisResultView({ ticker, stockName }: { ticker: string; stockName: string }) {
   const router = useRouter();
-  const [ready, setReady] = useState(false);
-  const [thesis, setThesis] = useState<Thesis | null>(null);
-  const [isNewDraft, setIsNewDraft] = useState(false);
+  const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [committing, setCommitting] = useState(false);
+  const generatingRef = useRef(false);
 
-  useEffect(() => {
-    // 이 draft/시드 조회는 브라우저 전용 인메모리 스토어를 읽는다 — 서버 렌더 시점엔
-    // 항상 비어 있으므로, 하이드레이션 불일치를 피하려고 마운트 후에만 반영한다.
-    const draft = getThesisDraft(ticker);
-    if (draft) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setThesis({
+  async function load() {
+    try {
+      // 이 draft 조회는 브라우저 전용 인메모리 스토어를 읽는다 — 서버 렌더 시점엔
+      // 항상 비어 있으므로, 하이드레이션 불일치를 피하려고 마운트 후에만 반영한다.
+      const draft = getThesisDraft(ticker);
+      if (!draft) {
+        const thesis = await getExistingThesisAction(ticker);
+        setState(thesis ? { status: "ready-existing", thesis } : { status: "no-draft" });
+        return;
+      }
+
+      const outcome: GenerateThesisResultOutcome = await generateThesisResultAction(ticker, {
         category: draft.category,
         followup: draft.followup,
         freeText: draft.freeText,
-        createdAt: draft.createdAt,
-        critique: generateCritique(draft.category, draft.followup),
-        premises: generatePremises(ticker, draft.category, draft.followup),
       });
-      setIsNewDraft(true);
-    } else {
-      const seedItem = initialWatchlist(false).find((i) => i.ticker === ticker && i.isSeed);
-      setThesis(seedItem?.thesis ?? null);
-      setIsNewDraft(false);
+
+      if (!outcome.ok) {
+        setState({ status: "error", reason: outcome.reason });
+        return;
+      }
+
+      setState({
+        status: "ready-new",
+        thesis: critiqueOutputToThesis(draft.category, draft.followup, draft.freeText, draft.createdAt, outcome.critique),
+        quote: outcome.quote,
+        critique: outcome.critique,
+      });
+    } catch {
+      // Server Action이 예상 못한 예외로 실패해도(네트워크 끊김 등) 화면이 로딩
+      // 상태로 영영 멈추지 않도록 항상 에러 상태로 떨어뜨린다.
+      setState({ status: "error", reason: "llm-error" });
     }
-    setReady(true);
+  }
+
+  useEffect(() => {
+    // Server Action은 세션당 20회 상한이 있는 유상 LLM 호출을 태울 수 있으므로,
+    // React Strict Mode의 effect 이중 실행으로 같은 종목에 두 번 과금되지 않도록 막는다.
+    if (generatingRef.current) return;
+    generatingRef.current = true;
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticker]);
 
-  if (!ready) return null;
+  if (state.status === "loading") return null;
 
-  if (!thesis) {
+  if (state.status === "no-draft") {
     return (
       <>
         <ScreenHeader title={stockName} />
@@ -62,25 +112,53 @@ export function ThesisResultView({ ticker, stockName }: { ticker: string; stockN
     );
   }
 
+  if (state.status === "error") {
+    const message =
+      state.reason === "quote-unavailable"
+        ? "시세를 불러오지 못했어요."
+        : state.reason === "llm-error"
+          ? "AI 검증 중 문제가 생겼어요."
+          : "이 세션에서 AI 검증을 더 이상 요청할 수 없어요.";
+    const canRetry = state.reason === "quote-unavailable" || state.reason === "llm-error";
+    return (
+      <>
+        <ScreenHeader title={stockName} onBack={() => router.push(`/thesis/${ticker}`)} />
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center text-sm text-muted-foreground">
+          <p>{message}</p>
+          {canRetry ? (
+            <Button
+              onClick={() => {
+                setState({ status: "loading" });
+                load();
+              }}
+            >
+              다시 시도
+            </Button>
+          ) : null}
+        </div>
+      </>
+    );
+  }
+
+  const { thesis } = state;
   const { critique } = thesis;
 
   function handleRewrite() {
     router.push(`/thesis/${ticker}`);
   }
 
-  function handleCommit() {
-    if (isNewDraft && thesis) {
-      const quote = quoteFor({ ticker, isSeed: false }, false);
-      addUserWatchlistItem({
-        id: `user-${ticker}-${crypto.randomUUID()}`,
-        ticker,
-        status: "watching",
-        isSeed: false,
-        addedPrice: quote.price,
-        addedAt: new Date().toISOString(),
-        thesis,
-      });
+  async function handleCommit() {
+    if (state.status !== "ready-new") {
+      router.push(`/?highlight=${ticker}`);
+      return;
     }
+    setCommitting(true);
+    await commitThesisAction(
+      ticker,
+      { category: thesis.category, followup: thesis.followup, freeText: thesis.freeText },
+      state.critique,
+      state.quote
+    );
     router.push(`/?highlight=${ticker}`);
   }
 
@@ -148,10 +226,10 @@ export function ThesisResultView({ ticker, stockName }: { ticker: string; stockN
       </div>
 
       <div className="flex shrink-0 gap-2 border-t border-border px-4 py-3">
-        <Button variant="outline" className="flex-1" onClick={handleRewrite}>
+        <Button variant="outline" className="flex-1" onClick={handleRewrite} disabled={committing}>
           다시 쓰기
         </Button>
-        <Button className="flex-1" onClick={handleCommit}>
+        <Button className="flex-1" onClick={handleCommit} disabled={committing}>
           이대로 담기
         </Button>
       </div>
