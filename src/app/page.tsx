@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
 import { badgeLabel, badgeState, changedCount, splitByStatus, type BadgeState } from "@/lib/mock";
+import { resolvePremises } from "@/lib/premises/engine";
 import { loadWatchlistList, loadWatchlistQuotes } from "./actions";
 import type { WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
 
@@ -117,12 +118,14 @@ function StockCard({
 
 export default function Home() {
   const router = useRouter();
-  const { isFuture, toggle, hydrated } = useDemoScenario();
+  const { scenario, toggle, hydrated } = useDemoScenario();
   const [highlightTicker, setHighlightTicker] = useState<string | null>(null);
 
+  // ADR-0004: 목록은 데모 시점과 무관한 DB 사실(종목/근거/기준값)만 담는다. 토글해도
+  // 이 쿼리는 다시 돌 필요가 없다 — 시점에 반응해야 하는 것은 아래 시세 쿼리뿐이다.
   const listQuery = useQuery({
     queryKey: ["watchlist", "list"],
-    queryFn: () => loadWatchlistList(isFuture),
+    queryFn: () => loadWatchlistList(),
     enabled: hydrated,
     staleTime: LIST_STALE_TIME_MS,
   });
@@ -137,15 +140,29 @@ export default function Home() {
     .sort()
     .join(",");
 
+  // 데모 시점에 의존하는 것은 이 쿼리뿐이고 그 뒤에 공유 상태가 없으므로, 시점을 키에
+  // 넣어 시나리오별 캐시 엔트리로 자연 분리한다 — 명시적 무효화가 필요 없다(ADR-0004).
   const quotesQuery = useQuery({
-    queryKey: ["watchlist", "quotes", isFuture, tickerKey],
-    queryFn: () => loadWatchlistQuotes(quoteTargets, isFuture),
+    queryKey: ["watchlist", "quotes", scenario, tickerKey],
+    queryFn: () => loadWatchlistQuotes(quoteTargets, scenario),
     enabled: hydrated && quoteTargets.length > 0,
     staleTime: QUOTES_STALE_TIME_MS,
   });
 
+  // 배지는 화면에 그리는 바로 그 시세에서 나온다. 가격만 미래로 바뀌고 배지가 과거에
+  // 남는 일이 구조적으로 불가능해진다(ADR-0004).
   const watchlist: WatchlistViewItem[] = useMemo(
-    () => listItems.map((item) => ({ ...item, quote: quotesQuery.data?.[item.ticker] ?? null })),
+    () =>
+      listItems.map((item) => {
+        const quote = quotesQuery.data?.[item.ticker] ?? null;
+        return {
+          ...item,
+          quote,
+          thesis: item.thesis
+            ? { ...item.thesis, premises: resolvePremises(item.thesis.premises, quote) }
+            : undefined,
+        };
+      }),
     [listItems, quotesQuery.data]
   );
 
@@ -172,10 +189,10 @@ export default function Home() {
           <h1 className="text-base font-semibold">관심종목</h1>
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             3개월 후 보기
-            <Switch checked={hydrated && isFuture} onCheckedChange={toggle} />
+            <Switch checked={hydrated && scenario === "future"} onCheckedChange={toggle} />
           </label>
         </div>
-        {isFuture ? (
+        {scenario === "future" ? (
           <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
             지금 보고 계신 가격·전제 상태는 시드 종목의 3개월 후 상황을 가정한 데모 값입니다.
           </p>

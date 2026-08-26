@@ -1,0 +1,1 @@
+ALTER TABLE "sessions" DROP COLUMN "demo_offset_days";

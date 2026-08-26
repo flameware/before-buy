@@ -7,19 +7,22 @@ import type { CritiqueOutput } from "@/lib/llm/types";
 import { getWatchlistListView, getWatchlistQuoteMap, type WatchlistListItem, type WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
 import { getWatchlistItemDetail, getWatchlistItemForOrder, removeWatchlistItem } from "@/lib/watchlist/get-watchlist-item";
 import { recordOrderEvent, type OrderEventInput } from "@/lib/order/record-order-event";
-import type { QuoteSnapshot, Thesis } from "@/lib/mock/types";
+import type { DemoScenario, QuoteSnapshot, Thesis } from "@/lib/mock/types";
 
-/** S1 목록 쿼리(React Query)가 호출하는 Server Action. 시세는 포함하지 않는다 (ADR-0002). */
-export async function loadWatchlistList(isFuture: boolean): Promise<WatchlistListItem[]> {
-  return getWatchlistListView(isFuture);
+/**
+ * S1 목록 쿼리(React Query)가 호출하는 Server Action. 시세도 데모 시점도 받지
+ * 않는다 — 시점에 의존하는 것은 시세뿐이다 (ADR-0002, ADR-0004).
+ */
+export async function loadWatchlistList(): Promise<WatchlistListItem[]> {
+  return getWatchlistListView();
 }
 
 /** S1 시세 쿼리(React Query)가 목록 로드 후 호출하는 Server Action. */
 export async function loadWatchlistQuotes(
   items: { ticker: string; isSeed: boolean }[],
-  isFuture: boolean
+  scenario: DemoScenario
 ): Promise<Record<string, QuoteSnapshot | null>> {
-  return getWatchlistQuoteMap(items, isFuture);
+  return getWatchlistQuoteMap(items, scenario);
 }
 
 /** S3 진입 시 1회: S2 draft에 실 시세를 붙여 LLM(critique+전제)을 생성한다. */
@@ -45,12 +48,12 @@ export async function commitThesisAction(
   return commitThesis(ticker, draft, critique, quote);
 }
 
-/** S4 진입: 세션 소유 관심종목을 ticker로 조회한다. 판정은 돌리지 않고 읽기만 한다. */
+/** S4 진입: 세션 소유 관심종목을 ticker로 조회한다. 전제 상태는 이 시점 시세로 계산된다. */
 export async function getOrderConfirmItemAction(
   ticker: string,
-  isFuture: boolean
+  scenario: DemoScenario
 ): Promise<WatchlistViewItem | null> {
-  return getWatchlistItemForOrder(ticker, isFuture);
+  return getWatchlistItemForOrder(ticker, scenario);
 }
 
 /** S4 취소/구매/시트닫기/근거갱신 4개 분기 모두에서 호출: order_events 1건을 남긴다. */
@@ -58,12 +61,12 @@ export async function recordOrderEventAction(input: OrderEventInput): Promise<vo
   return recordOrderEvent(input);
 }
 
-/** S5 진입: 해당 종목만 단건 재판정한 뒤 최신 상태를 조회한다. */
+/** S5 진입: 해당 종목 1건을 조회한다. 전제 상태는 이 시점 시세로 계산된다. */
 export async function getWatchlistItemDetailAction(
   ticker: string,
-  isFuture: boolean
+  scenario: DemoScenario
 ): Promise<WatchlistViewItem | null> {
-  return getWatchlistItemDetail(ticker, isFuture);
+  return getWatchlistItemDetail(ticker, scenario);
 }
 
 /** S5 "관심종목에서 제외": watchlist_items.status를 'removed'로 실제 update한다. */

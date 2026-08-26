@@ -14,7 +14,7 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-  demoOffsetDays: integer("demo_offset_days").notNull().default(0),
+  // ADR-0004: 데모 시점은 서버가 기억하지 않는다 — 클라이언트가 조회 인자로 넘긴다.
   llmCallCount: integer("llm_call_count").notNull().default(0),
 });
 
@@ -72,9 +72,9 @@ export const premises = pgTable("premises", {
   statement: text("statement").notNull(),
   checkType: text("check_type").notNull(), // price | valuation | fundamental | qualitative
   checkConfig: jsonb("check_config"), // {metric, operator, value, period}
+  // ADR-0004: status/observed_value는 fundamental|qualitative 전제에만 의미가 있다.
+  // price|valuation 전제는 저장된 값을 무시하고 조회 시 시세로 계산한다.
   status: text("status").notNull(), // intact | broken | pending | manual
-  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
-  brokenAt: timestamp("broken_at", { withTimezone: true }),
   observedValue: text("observed_value"),
 });
 
