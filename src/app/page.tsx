@@ -1,15 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
 import { badgeLabel, badgeState, changedCount, splitByStatus, type BadgeState } from "@/lib/mock";
-import { loadWatchlist } from "./actions";
+import { loadWatchlistList, loadWatchlistQuotes } from "./actions";
 import type { WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
+
+/** ADR-0002: 목록은 60초, 시세는 20초 — 재방문 시 캐시가 신선하면 즉시 렌더하고 조용히 갱신한다. */
+const LIST_STALE_TIME_MS = 60_000;
+const QUOTES_STALE_TIME_MS = 20_000;
 
 const priceFormat = new Intl.NumberFormat("ko-KR");
 
@@ -113,26 +118,38 @@ function StockCard({
 export default function Home() {
   const router = useRouter();
   const { isFuture, toggle, hydrated } = useDemoScenario();
-  const [watchlist, setWatchlist] = useState<WatchlistViewItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [highlightTicker, setHighlightTicker] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    loadWatchlist(isFuture).then((items) => {
-      if (!cancelled) {
-        setWatchlist(items);
-        setLoading(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [hydrated, isFuture]);
+  const listQuery = useQuery({
+    queryKey: ["watchlist", "list"],
+    queryFn: () => loadWatchlistList(isFuture),
+    enabled: hydrated,
+    staleTime: LIST_STALE_TIME_MS,
+  });
 
+  const listItems = useMemo(() => listQuery.data ?? [], [listQuery.data]);
+  const quoteTargets = useMemo(
+    () => listItems.map((item) => ({ ticker: item.ticker, isSeed: item.isSeed })),
+    [listItems]
+  );
+  const tickerKey = quoteTargets
+    .map((t) => t.ticker)
+    .sort()
+    .join(",");
+
+  const quotesQuery = useQuery({
+    queryKey: ["watchlist", "quotes", isFuture, tickerKey],
+    queryFn: () => loadWatchlistQuotes(quoteTargets, isFuture),
+    enabled: hydrated && quoteTargets.length > 0,
+    staleTime: QUOTES_STALE_TIME_MS,
+  });
+
+  const watchlist: WatchlistViewItem[] = useMemo(
+    () => listItems.map((item) => ({ ...item, quote: quotesQuery.data?.[item.ticker] ?? null })),
+    [listItems, quotesQuery.data]
+  );
+
+  const loading = listQuery.isLoading;
   const { watching, bought } = splitByStatus(watchlist);
   const numChanged = changedCount(watchlist);
 
