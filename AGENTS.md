@@ -8,6 +8,10 @@ Issues live in this repo's GitHub Issues, managed via the `gh` CLI. See `docs/ag
 
 Single-context layout — `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### LLM experiments
+
+Paid API calls that compare conditions — models, prompts, parameters, output modes — bill per call and multiply fast. Read `docs/agents/llm-experiments.md` before running any of them.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
