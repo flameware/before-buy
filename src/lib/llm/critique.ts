@@ -5,55 +5,81 @@
 // 쓰는 건 이 모듈의 일이 아니다 — 파싱된 결과를 반환할 뿐이고, 저장은 화면별
 // 배선 티켓(#47 등)의 몫이다.
 //
+// 출력은 강제 tool-call이 아니라 구조화 출력(output_config.format)으로 받는다 —
+// 이슈 #58에서 실측한 결과, 같은 모델·같은 프롬프트라도 강제 tool-call 경로에서만
+// 사용자에게 보이는 한국어가 깨지고(문장의 5.8%) premises가 누락됐다. 구조화 출력에서는
+// 같은 조건에서 깨짐 0%, premises 누락 0회였다. 자세한 실측표는 이슈 #58 참고.
+//
 // 재시도는 두 레이어로 나뉜다: 네트워크/5xx/429는 client.ts의 SDK maxRetries가
 // 전송 레벨에서 처리하고, 응답 내용이 스키마에 맞지 않거나 모순되는 경우(HTTP는
-// 성공했지만 tool 입력이 잘못된 경우)는 SDK 재시도 범위 밖이라 이 함수가 같은
+// 성공했지만 내용이 잘못된 경우)는 SDK 재시도 범위 밖이라 이 함수가 같은
 // 입력으로 한 번 더 수동 요청한다.
 
 import "server-only";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { incrementLlmCallCount } from "@/lib/db/session";
 import { getAnthropicClient, CRITIQUE_MODEL } from "./client";
 import { buildFewShotMessages, buildSystemPrompt, buildUserMessage } from "./prompt";
-import { CritiqueToolInputSchema, logForbiddenWords, toPremises } from "./schemas";
-import { CRITIQUE_TOOL, CRITIQUE_TOOL_NAME } from "./tool";
+import {
+  CritiqueOutputSchema,
+  CritiqueRawOutput,
+  findSemanticProblems,
+  logForbiddenWords,
+  toPremises,
+} from "./schemas";
 import { CritiqueInput, CritiqueOutput, LLMCallLimitExceededError, LLMError } from "./types";
 
-// 1024는 few-shot 대화 검증 중 실측 출력(2~3개 counterpoints + 2~4개 premises)이
-// max_tokens에 걸려 잘리는 걸 확인해 올림. 2048에서는 여유 있게 완결됨을 확인했다.
-const MAX_TOKENS = 2048;
+// 구조화 출력 실측 평균 출력이 ~1,600 토큰이라 여유를 크게 잡는다. max_tokens는 상한일
+// 뿐이라 실제로 쓴 만큼만 과금되고, 반대로 상한이 빠듯하면 스키마 마지막 필드(premises)가
+// 통째로 절삭된다 — 이슈 #58에서 2048로 재현된 실패 모드다.
+const MAX_TOKENS = 8192;
 const VALIDATION_RETRY_COUNT = 1;
 
-async function callOnce(input: CritiqueInput): Promise<unknown> {
+async function callOnce(input: CritiqueInput): Promise<CritiqueRawOutput> {
   const client = getAnthropicClient();
-  const message = await client.messages.create({
+  const message = await client.messages.parse({
     model: CRITIQUE_MODEL,
     max_tokens: MAX_TOKENS,
     system: buildSystemPrompt(input.category),
-    tools: [CRITIQUE_TOOL],
-    tool_choice: { type: "tool", name: CRITIQUE_TOOL_NAME },
+    output_config: { format: zodOutputFormat(CritiqueOutputSchema) },
     messages: [...buildFewShotMessages(), { role: "user", content: buildUserMessage(input) }],
   });
 
-  const toolUse = message.content.find((block) => block.type === "tool_use");
-  if (!toolUse) throw new LLMError("모델이 tool_use 블록을 반환하지 않았습니다");
-  return toolUse.input;
+  if (message.stop_reason === "max_tokens") {
+    throw new LLMError(`응답이 max_tokens(${MAX_TOKENS})에서 잘렸습니다`);
+  }
+  // parsed_output은 스키마 검증에 실패하면 null이다.
+  if (!message.parsed_output) {
+    throw new LLMError("모델 응답이 출력 스키마와 맞지 않습니다");
+  }
+  return message.parsed_output;
 }
 
 /**
- * 검증 실패(zod 파싱 실패 또는 모순 refine 실패)에 한해 같은 입력으로 한 번 더
- * 요청한다. 전송 레벨 실패는 client.ts의 SDK maxRetries가 이미 처리했으므로
- * 여기 도달한 예외는 그대로 던진다 — 재시도할 대상이 아니다.
+ * 형식 검증 실패 또는 내용 모순에 한해 같은 입력으로 한 번 더 요청한다.
+ * 전송 레벨 실패는 client.ts의 SDK maxRetries가 이미 처리했으므로 여기 도달한
+ * 그 외 예외는 그대로 던진다 — 재시도할 대상이 아니다.
  */
-async function callWithValidationRetry(input: CritiqueInput) {
-  let lastError: unknown;
+async function callWithValidationRetry(input: CritiqueInput): Promise<CritiqueRawOutput> {
+  let lastProblem = "";
+
   for (let attempt = 0; attempt <= VALIDATION_RETRY_COUNT; attempt++) {
-    const raw = await callOnce(input);
-    const parsed = CritiqueToolInputSchema.safeParse(raw);
-    if (parsed.success) return parsed.data;
-    lastError = parsed.error;
+    let parsed: CritiqueRawOutput;
+    try {
+      parsed = await callOnce(input);
+    } catch (error) {
+      if (!(error instanceof LLMError) || attempt === VALIDATION_RETRY_COUNT) throw error;
+      lastProblem = error.message;
+      continue;
+    }
+
+    const problems = findSemanticProblems(parsed);
+    if (problems.length === 0) return parsed;
+    lastProblem = problems.join("; ");
   }
+
   throw new LLMError(
-    `모델 응답이 스키마 검증에 실패했습니다 (재시도 ${VALIDATION_RETRY_COUNT}회 포함): ${String(lastError)}`
+    `모델 응답이 검증에 실패했습니다 (재시도 ${VALIDATION_RETRY_COUNT}회 포함): ${lastProblem}`
   );
 }
 
