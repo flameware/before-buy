@@ -110,8 +110,9 @@ async function fetchLatestTheses(watchlistItemIds: string[]): Promise<Map<string
 }
 
 /**
- * 시드 종목은 데모 오프셋에 맞는 fixture 시세를, 그 외 종목은 KIS 실전 도메인
- * 배치 조회 결과를 쓴다. 개별 종목 조회 실패는 `null`로 표시해 화면이 폴백을 그리게 한다.
+ * 시드 종목도 현재 시점(isFuture=false)에는 그 외 종목과 동일하게 KIS 실전 도메인
+ * 배치 조회 결과를 쓴다. "3개월 후" 토글일 때만 시드 종목에 한해 데모 오프셋에 맞는
+ * fixture 시세를 참조한다. 개별 종목 조회 실패는 `null`로 표시해 화면이 폴백을 그리게 한다.
  */
 async function resolveQuotes(
   items: { ticker: string; isSeed: boolean }[],
@@ -119,12 +120,14 @@ async function resolveQuotes(
 ): Promise<Map<string, QuoteSnapshot | null>> {
   const quotes = new Map<string, QuoteSnapshot | null>();
 
-  const seedTickers = [...new Set(items.filter((i) => i.isSeed).map((i) => i.ticker))];
-  for (const ticker of seedTickers) {
-    quotes.set(ticker, resolveSeedQuote(ticker, isFuture) ?? null);
+  if (isFuture) {
+    const seedTickers = [...new Set(items.filter((i) => i.isSeed).map((i) => i.ticker))];
+    for (const ticker of seedTickers) {
+      quotes.set(ticker, resolveSeedQuote(ticker, true) ?? null);
+    }
   }
 
-  const liveTickers = [...new Set(items.filter((i) => !i.isSeed).map((i) => i.ticker))];
+  const liveTickers = [...new Set(items.filter((i) => !i.isSeed || !isFuture).map((i) => i.ticker))];
   if (liveTickers.length > 0) {
     const liveResults = await getKoreanStockPrices(liveTickers);
     for (const ticker of liveTickers) {
