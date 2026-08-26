@@ -137,8 +137,9 @@ async function fetchLatestTheses(
 }
 
 /**
- * 시드 종목은 `resolveSeedQuote`로 데모 오프셋에 맞는 fixture 값을 참조하고,
- * 그 외 종목은 항상 KIS 실전 도메인 실시간 시세를 쓴다(오프셋 무시) — 지도 Destination 참고.
+ * 시드 종목도 현재 시점(isFuture=false)에는 그 외 종목과 동일하게 KIS 실전 도메인
+ * 실시간 시세를 쓴다. "3개월 후" 토글(isFuture=true)일 때만 시드 종목에 한해
+ * `resolveSeedQuote`의 fixture future 값을 참조한다 — 지도 Destination 참고.
  */
 async function resolveQuotes(
   targets: WatchlistTarget[],
@@ -146,13 +147,15 @@ async function resolveQuotes(
 ): Promise<Map<string, Quote | null>> {
   const quotes = new Map<string, Quote | null>();
 
-  const seedTickers = [...new Set(targets.filter((t) => t.isSeed).map((t) => t.ticker))];
-  for (const ticker of seedTickers) {
-    const seedQuote = resolveSeedQuote(ticker, isFuture);
-    quotes.set(ticker, seedQuote ? { price: seedQuote.price, per: seedQuote.per, pbr: seedQuote.pbr } : null);
+  if (isFuture) {
+    const seedTickers = [...new Set(targets.filter((t) => t.isSeed).map((t) => t.ticker))];
+    for (const ticker of seedTickers) {
+      const seedQuote = resolveSeedQuote(ticker, true);
+      quotes.set(ticker, seedQuote ? { price: seedQuote.price, per: seedQuote.per, pbr: seedQuote.pbr } : null);
+    }
   }
 
-  const liveTickers = [...new Set(targets.filter((t) => !t.isSeed).map((t) => t.ticker))];
+  const liveTickers = [...new Set(targets.filter((t) => !t.isSeed || !isFuture).map((t) => t.ticker))];
   if (liveTickers.length > 0) {
     const liveResults = await getKoreanStockPrices(liveTickers);
     for (const ticker of liveTickers) {
