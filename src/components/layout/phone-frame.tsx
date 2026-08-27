@@ -2,6 +2,7 @@
 
 import { createContext, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { ToastViewport } from "@/components/ui/toast";
 
 /**
  * Drawer(base-ui)의 Portal은 기본적으로 `document.body`에 붙는다 — React 트리상
@@ -39,6 +40,8 @@ export function PhoneFrame({
       >
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
         <PhoneFrameContext.Provider value={frameRef}>{modal}</PhoneFrameContext.Provider>
+        {/* 프레임의 DOM 후손이라 데스크톱에서도 402px 액자 안 하단에 머문다. */}
+        <ToastViewport />
       </div>
     </div>
   );
