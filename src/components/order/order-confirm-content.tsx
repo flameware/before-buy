@@ -14,7 +14,8 @@ import { useFrozen } from "@/hooks/use-frozen";
 import { snapshotOf, type QuoteState } from "@/lib/quote/quote-state";
 import { useWatchlistItemView } from "@/hooks/use-watchlist-view";
 import { composeView } from "@/lib/watchlist/compose-view";
-import { badgeState, getCategory } from "@/lib/mock";
+import { getCategory } from "@/lib/mock";
+import { badgeDisplay } from "@/lib/premises/badge";
 import { recordOrderEventAction, recordOrderEventByTickerAction } from "@/app/actions";
 import type { OrderEventAction } from "@/lib/order/record-order-event";
 
@@ -132,7 +133,11 @@ export function OrderConfirmContent({
   // 다수 경로다. 실제 본문과 같은 높이를 만들어 drawer의 450ms height 트랜지션이
   // 탈 구간을 없애는 것이 이 skeleton의 목적이다.
   const thesis = item?.thesis;
-  const changed = !!thesis && badgeState(item!) === "changed";
+  // 매수 직전 화면이라 확신을 지어내지 않는 것이 특히 중요하다 — 시세를 못 불러와 전제를
+  // 판정할 수 없으면 "유지"라고 말하지 않고 그렇게 말한다(#81). 그래도 **매수는 막지
+  // 않는다**: 판정 불가는 사용자의 결정을 대신 내릴 근거가 아니다.
+  const badge = item ? badgeDisplay(item, item.quote) : null;
+  const changed = badge?.kind === "badge" && badge.state === "changed";
 
   const body = (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -161,10 +166,21 @@ export function OrderConfirmContent({
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">전제 상태</span>
-              <Badge variant={changed ? "destructive" : "secondary"}>
-                {changed ? "달라짐" : "유지"}
-              </Badge>
+              {badge?.kind === "pending" ? (
+                <Skeleton className="h-5 w-12 rounded-full" />
+              ) : badge?.kind === "unknown" ? (
+                <Badge variant="outline">확인 불가</Badge>
+              ) : (
+                <Badge variant={changed ? "destructive" : "secondary"}>
+                  {changed ? "달라짐" : "유지"}
+                </Badge>
+              )}
             </div>
+            {badge?.kind === "unknown" ? (
+              <p className="text-xs text-muted-foreground">
+                시세를 불러오지 못해 지금은 근거가 유효한지 확인할 수 없어요.
+              </p>
+            ) : null}
             {changed ? (
               <button
                 type="button"
