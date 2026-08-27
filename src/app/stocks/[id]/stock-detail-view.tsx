@@ -1,7 +1,6 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { Bookmark } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   AlertDialog,
@@ -166,12 +165,7 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
 
   return (
     <>
-      {/* 북마크는 관심종목일 때만 있다. 보유중에는 제외 경로가 애초에 없고(화면명세 S5),
-          비활성 아이콘을 그려두면 "왜 안 눌리지"라는 질문만 만들고 답은 주지 않는다. */}
-      <ScreenHeader
-        title={stockName}
-        action={isBought ? undefined : <RemoveFromWatchlistButton onConfirm={handleRemove} />}
-      />
+      <ScreenHeader title={stockName} />
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
         <section className="flex flex-col gap-2 rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
           {isBought ? (
@@ -274,32 +268,32 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
           </section>
         ) : null}
 
-        {/* 보유중의 근거 갱신은 body 맨 아래에 둔다 — 하단 바는 `판매`/`구매` 대칭에
-            내주고, 이 버튼은 "전제별 상태"를 다 읽은 뒤 자연스럽게 닿는 자리에 온다.
-            예전에는 보유중에 하단 바 자체가 없어서, 전제 추적은 계속되는데 근거를 고칠
-            길은 없었다(#105). */}
-        {isBought ? (
-          <Button size="lg" className="w-full" onClick={handleUpdateThesis}>
-            {updateThesisLabel}
-          </Button>
-        ) : null}
+        {/* 근거 갱신은 **두 상태 모두** body 맨 아래에 둔다 — 관심종목과 보유중이 같은
+            골격을 갖게 하는 것이 이 배치의 목적이다(#105). 앰버라 body 안에서도 충분히
+            눈에 띄므로 하단 바에 고정할 이유가 적고, 하단 바는 그만큼 비워 각 상태의
+            고유한 행동(`관심종목에서 제외`·`판매`)에 내준다.
+            근거가 없는 종목이면 라벨이 `근거 적기`가 되는데, 그때는 바로 위의 "아직 왜
+            담았는지 적어두지 않았어요" 빈 카드가 이 버튼을 가리키게 된다. */}
+        <Button size="lg" className="w-full" onClick={handleUpdateThesis}>
+          {updateThesisLabel}
+        </Button>
       </div>
 
-      {/* 하단 바는 이 화면에서 지금 하고 싶은 일만 담는다. 관심종목에서 빼는 것은 매매도
-          검토도 아닌 정리 행위라 헤더 북마크로 올라갔다.
+      {/* 하단 바는 두 상태가 같은 자리를 쓰되 왼쪽 칸만 갈린다 — 오른쪽은 언제나 `구매`다.
+          왼쪽에 오는 것은 그 상태에서만 뜻이 있는 행동이다: 아직 안 샀으면 담아둔 것을
+          치우는 일, 이미 샀으면 파는 일.
 
           보유중의 `판매`/`구매`는 매도를 권하는 것이 아니라, 보유한 종목의 상세에서
           양방향을 동등하게 열어두는 것이다 — 대칭을 깨는 시각 처리(판매만 약하게 그리기
-          등)는 제품이 매수 쪽으로 기울었다는 신호가 되므로 하지 않는다 (ADR-0009). */}
+          등)는 제품이 매수 쪽으로 기울었다는 신호가 되므로 하지 않는다 (ADR-0009).
+          반대로 `관심종목에서 제외`는 매매가 아니라 정리 행위라 outline으로 물러선다. */}
       <div data-slot="action-bar" className="flex shrink-0 gap-2 border-t border-border px-4 py-3">
         {isBought ? (
           <Button variant="sell" size="lg" className="flex-1" onClick={handleSell}>
             판매
           </Button>
         ) : (
-          <Button size="lg" className="flex-1" onClick={handleUpdateThesis}>
-            {updateThesisLabel}
-          </Button>
+          <RemoveFromWatchlistButton onConfirm={handleRemove} />
         )}
         <Button variant="buy" size="lg" className="flex-1" onClick={handleBuy}>
           구매
@@ -310,19 +304,19 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
 }
 
 /**
- * 관심종목 해제. 토글 아이콘은 "껐다 켤 수 있다"고 약속하지만 **실제로는 되돌릴 수 없다** —
- * `removeWatchlistItem`은 `status: "removed"` 소프트 삭제인데 다시 담는 경로가 그 행을
- * 되살리지 않고 새로 심는다(`add-without-thesis.ts`, `commit-thesis.ts`). 근거는 사라지고
- * 담은 날 가격도 오늘로 새로 시작한다. 그래서 해제 방향에만 확인을 세운다.
+ * 관심종목 해제. **확인을 세우는 이유는 되돌릴 수 없기 때문이다** — `removeWatchlistItem`은
+ * `status: "removed"` 소프트 삭제지만 다시 담는 경로가 그 행을 되살리지 않고 새로 심는다
+ * (`add-without-thesis.ts`, `commit-thesis.ts`). 근거는 사라지고 담은 날 가격도 오늘로 새로
+ * 시작한다. 버튼이 어디에 놓이든 이 사실은 그대로이고, 지금은 눈에 띄는 `구매` 바로 옆이라
+ * 오탭 비용이 오히려 더 크다.
  */
 function RemoveFromWatchlistButton({ onConfirm }: { onConfirm: () => void }) {
   return (
     <AlertDialog>
       <AlertDialogTrigger
-        aria-label="관심종목에서 빼기"
-        className="-mr-2 flex size-8 shrink-0 items-center justify-center rounded-full text-primary hover:bg-muted"
+        render={<Button variant="outline" size="lg" className="flex-1" />}
       >
-        <Bookmark className="size-5 fill-current" />
+        관심종목에서 제외
       </AlertDialogTrigger>
       <AlertDialogContent size="sm">
         <AlertDialogHeader>

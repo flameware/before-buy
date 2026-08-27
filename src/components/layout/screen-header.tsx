@@ -4,22 +4,15 @@ import { ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
-/**
- * S1.5/S2/S3/S5 공통 헤더 — `←` + 타이틀. S1은 뒤로가기가 없는 홈이라 별도 구성.
- *
- * `action`은 타이틀 줄 오른쪽 끝에 붙는 자리다. 지금 쓰는 곳은 S5 관심종목의 북마크
- * 하나뿐 — 하단 바에 있던 `관심종목에서 제외`가 여기로 올라왔다(#105).
- */
+/** S1.5/S2/S3/S5 공통 헤더 — `←` + 타이틀. S1은 뒤로가기가 없는 홈이라 별도 구성. */
 export function ScreenHeader({
   title,
   subtitle,
   onBack,
-  action,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
   onBack?: () => void;
-  action?: ReactNode;
 }) {
   const router = useRouter();
 
@@ -34,8 +27,7 @@ export function ScreenHeader({
         >
           <ChevronLeft className="size-5" />
         </button>
-        <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{title}</h1>
-        {action}
+        <h1 className="text-base font-semibold">{title}</h1>
       </div>
       {subtitle ? <div className="pl-8 text-sm text-muted-foreground">{subtitle}</div> : null}
     </header>
