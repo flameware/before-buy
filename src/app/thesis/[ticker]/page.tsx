@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { isTickerShaped } from "@/lib/kis/stock-master-parse";
 import { resolveStock } from "@/lib/stock/resolve-stock";
-import { isTickerWatched } from "@/lib/watchlist/get-watchlist-item";
 import { ThesisFlow } from "./thesis-flow";
 
 // S2 근거 입력 (3-step)
@@ -17,9 +16,15 @@ export default async function ThesisPage({
   // 이미 담긴 종목이면 Step 1의 "건너뛰기"를 감춘다 — 근거 없이 한 번 더 담아
   // 중복 카드를 만드는 길을 열어두지 않는다 (#96). 클라이언트 캐시가 아니라 여기서
   // 판정하는 이유는 직접 URL 진입·새로고침에도 답이 같아야 하기 때문이다.
+  //
+  // db 계층은 **동적으로** 부른다. 이 파일이 모듈 최상단에서 임포트하면 Next가 빌드 때
+  // 라우트 설정을 모으느라 페이지 모듈을 평가하는 순간 `src/lib/db/index.ts`의
+  // `neon(process.env.DATABASE_URL!)`이 함께 실행되고, DATABASE_URL이 없는 프리뷰
+  // 빌드는 거기서 죽는다. 이 저장소의 다른 페이지 모듈이 db를 임포트하지 않는 것도
+  // 같은 이유다 — S5는 KIS만 보는 resolveStock만 쓰고 DB는 전부 Server Action에 맡긴다.
   const [stock, alreadyWatched] = await Promise.all([
     resolveStock(ticker),
-    isTickerWatched(ticker),
+    import("@/lib/watchlist/get-watchlist-item").then((m) => m.isTickerWatched(ticker)),
   ]);
   return (
     <ThesisFlow ticker={stock.ticker} stockName={stock.name} alreadyWatched={alreadyWatched} />
