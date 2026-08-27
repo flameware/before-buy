@@ -4,7 +4,7 @@
 // mock/types.ts의 Critique/Premise(UI용, id·status 등을 포함)와는 다른 계층 —
 // 이 모듈은 LLM 원시 출력만 다루고, DB row로 만드는 건 호출부(#47)의 몫이다.
 
-import type { CheckType, ThesisCategory } from "@/lib/mock/types";
+import type { CheckType, PremiseKind, ThesisCategory } from "@/lib/mock/types";
 
 export class LLMError extends Error {}
 
@@ -32,8 +32,9 @@ export interface LLMCounterpoint {
 }
 
 export type LLMCheckConfig = {
+  /** 비교 방향은 이 값이 결정한다. 모델은 `lte`/`gte`를 고르지 않는다 (ADR-0007). */
+  kind?: PremiseKind;
   metric?: "per" | "pbr";
-  operator?: "lte" | "gte";
   value?: number;
   period?: string;
 };

@@ -9,7 +9,22 @@ export type ThesisCategory =
 
 export type CheckType = "price" | "valuation" | "fundamental" | "qualitative";
 
-export type PremiseStatus = "intact" | "broken" | "pending" | "manual";
+/**
+ * 전제의 판정 결과. 앞의 넷은 **유지 조건**(지금 참이어야 하는 것)의 어휘이고, 뒤의 둘은
+ * **도달 목표**(아직 오지 않은 기대)의 어휘다 — CONTEXT.md 참조.
+ *
+ * 도달 목표는 `intact`/`broken`을 쓰지 않는다. 미도달을 `intact`로 두면 "이 전제는
+ * 유효하다"는 거짓말이 되고, `broken`으로 두면 아직 오지 않았을 뿐인 것이 "생각이 틀어졌다"로
+ * 읽힌다. 어휘가 갈려 있으므로 **도달 목표는 배지에 투표할 수 없다** — `badgeState`가
+ * `broken`만 세는 것으로 그 보장이 타입 수준에서 성립한다.
+ */
+export type PremiseStatus =
+  | "intact"
+  | "broken"
+  | "pending"
+  | "manual"
+  | "awaiting"
+  | "reached";
 
 /**
  * 데모 시점 (CONTEXT.md). 전제 판정과 시세를 어느 시점 기준으로 볼지 고르는 값 —
@@ -18,12 +33,25 @@ export type PremiseStatus = "intact" | "broken" | "pending" | "manual";
  */
 export type DemoScenario = "current" | "future";
 
+/**
+ * 자동 확인 전제의 종류. **방향은 여기서 결정된다** — "손절선"이라고 말한 순간 비교
+ * 방향은 정해지므로 `lte`/`gte`를 따로 받지 않는다(#85). 판정하는 쪽이 아니라 기록하는
+ * 쪽이 방향을 고르게 두면, 문장은 손절선인데 비교는 반대인 조합이 아무 저항 없이 통과한다.
+ *
+ * - `stop-loss` — 가격 하한. 아래로 내려가면 깨짐. **유지 조건**
+ * - `value-ceiling` — 상한. `metric`이 있으면 PER·PBR, 없으면 가격. 위로 넘으면 깨짐. **유지 조건**
+ * - `target-price` — 가격 상한. 닿으면 `reached`. **도달 목표**
+ */
+export type PremiseKind = "stop-loss" | "value-ceiling" | "target-price";
+
 /** `price`/`valuation` 전제를 시세와 비교하기 위한 기준. LLM이 채우고 DB에 저장된다. */
 export interface PremiseCheckConfig {
+  kind?: PremiseKind;
+  /** `value-ceiling`에서만 의미가 있다. 없으면 가격 기준 상한. */
   metric?: "per" | "pbr";
-  operator?: "lte" | "gte";
   value?: number;
 }
+
 
 export type WatchlistStatus = "watching" | "bought" | "removed";
 

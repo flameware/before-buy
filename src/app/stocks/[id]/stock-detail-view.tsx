@@ -73,6 +73,12 @@ function PremiseRow({ premise, quotePending }: { premise: Premise; quotePending:
         </p>
       ) : premise.status === "manual" || premise.status === "pending" ? (
         <p className="text-xs text-muted-foreground">{premise.manualNote ?? "아직 직접 확인이 필요해요."}</p>
+      ) : premise.status === "awaiting" ? (
+        // 도달 목표는 조용히 둔다 — 미도달은 생각이 틀어진 게 아니라 진행 중인 것이라
+        // `broken`처럼 눈에 띄어서는 안 된다 (#85).
+        <p className="text-xs text-muted-foreground">아직 도달하지 않았어요 — 지금은 {premise.observedValue}</p>
+      ) : premise.status === "reached" ? (
+        <p className="text-xs text-muted-foreground">생각하신 가격에 닿았어요 — 지금은 {premise.observedValue}</p>
       ) : premise.observedValue ? (
         <p className="text-xs text-muted-foreground">현재 {premise.observedValue}</p>
       ) : null}

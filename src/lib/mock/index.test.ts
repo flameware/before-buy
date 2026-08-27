@@ -41,6 +41,14 @@ describe("badgeState", () => {
     expect(badgeState(item({ thesis: thesis([premise("intact"), premise("manual")]) }))).toBe("intact");
   });
 
+  // #85 회귀 잠금: 도달 목표는 배지에 투표하지 않는다. 목표가에 아직 닿지 않은 것은
+  // 생각이 틀어진 게 아니라 진행 중인 것이라 "달라짐"이 될 수 없고, 닿은 것도 마찬가지다.
+  // 이 보장은 `badgeState`의 필터가 아니라 **상태 어휘가 갈려 있다는 사실**에서 나온다 —
+  // 도달 목표는 `broken`을 낼 수 없다(engine.ts의 `judge`).
+  it.each(["awaiting", "reached"] as const)("도달 목표(%s)는 달라짐을 만들지 않는다", (status) => {
+    expect(badgeState(item({ thesis: thesis([premise("intact"), premise(status)]) }))).toBe("intact");
+  });
+
   // 아래는 **현 동작의 기록이지 옳다는 승인이 아니다.** `pending`(판정 불가)을
   // "유지 중"으로 접는 것이 #79/#81이 난 자리다 — 이 함수는 시세 상태를 보지 않아
   // "깨지지 않음"과 "유효함"을 구분하지 못한다. #81이 `badgeDisplay`로 그 판단을 모으면

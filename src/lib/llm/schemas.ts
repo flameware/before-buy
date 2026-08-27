@@ -14,9 +14,11 @@ import type { LLMCheckConfig, LLMPremise } from "./types";
 
 const FORBIDDEN_WORDS = ["논지", "가설", "전제", "테제", "정합성", "밸류에이션"];
 
+// `operator`를 받지 않는다 (ADR-0007). 비교 방향은 `kind`가 결정하고 엔진이 도출한다 —
+// 모델에게 자유도를 주는 자리가 곧 틀릴 수 있는 자리인데, 이 자리는 자유도가 필요 없다.
 const CheckConfigSchema = z.object({
+  kind: z.enum(["stop-loss", "value-ceiling", "target-price"]).nullable(),
   metric: z.enum(["per", "pbr"]).nullable(),
-  operator: z.enum(["lte", "gte"]).nullable(),
   value: z.number().nullable(),
   period: z.string().nullable(),
 });
@@ -44,10 +46,35 @@ export const CritiqueOutputSchema = z.object({
 export type CritiqueRawOutput = z.infer<typeof CritiqueOutputSchema>;
 
 /**
+ * 가격 기준선이 담은 날 가격의 옳은 쪽에 있는지 본다. **경계는 허용한다** — 사용자가
+ * 현재가를 그대로 손절선이나 목표가로 답하는 것은 정상적인 답이다.
+ */
+function checkDirection(
+  index: number,
+  kind: "stop-loss" | "value-ceiling" | "target-price",
+  value: number,
+  anchorPrice: number
+): string[] {
+  const below = value <= anchorPrice;
+  if (kind === "stop-loss" && !below) {
+    return [`premises[${index}]: 손절선 ${value}는 담은 날 가격 ${anchorPrice}보다 높습니다`];
+  }
+  if (kind !== "stop-loss" && below && value !== anchorPrice) {
+    const label = kind === "target-price" ? "목표가" : "가격 상한";
+    return [`premises[${index}]: ${label} ${value}는 담은 날 가격 ${anchorPrice}보다 낮습니다`];
+  }
+  return [];
+}
+
+/**
  * 형식은 통과했지만 내용이 스펙에 어긋나는 지점을 모아 돌려준다.
  * 빈 배열이면 정상. 호출부는 비어 있지 않으면 재시도한다.
+ *
+ * `anchorPrice`는 사용자가 이 근거를 쓸 때 보고 있던 가격이다. 손절선은 그보다 아래,
+ * 목표가는 그보다 위여야 말이 된다 — 이 대조가 없어서 "손절선인데 현재가보다 높은 값"이
+ * 담은 날부터 깨진 전제로 보이는 버그가 통과했다(#85).
  */
-export function findSemanticProblems(v: CritiqueRawOutput): string[] {
+export function findSemanticProblems(v: CritiqueRawOutput, anchorPrice: number): string[] {
   const problems: string[] = [];
 
   if (v.is_challengeable && v.counterpoints.length === 0) {
@@ -59,9 +86,27 @@ export function findSemanticProblems(v: CritiqueRawOutput): string[] {
       problems.push(`premises[${i}].statement가 비어 있습니다`);
     }
     if (p.check_type !== "price" && p.check_type !== "valuation") continue;
-    if (p.check_config?.operator == null || p.check_config?.value == null) {
-      problems.push(`premises[${i}]: price/valuation 전제는 check_config.operator와 value가 필요합니다`);
+
+    const config = p.check_config;
+    if (config?.kind == null || config.value == null) {
+      problems.push(`premises[${i}]: price/valuation 전제는 check_config.kind와 value가 필요합니다`);
+      continue;
     }
+
+    if (p.check_type === "valuation") {
+      if (config.kind !== "value-ceiling") {
+        problems.push(`premises[${i}]: valuation 전제의 kind는 value-ceiling이어야 합니다 (받은 값: ${config.kind})`);
+      }
+      if (config.metric == null) {
+        problems.push(`premises[${i}]: valuation 전제는 check_config.metric이 필요합니다`);
+      }
+      continue;
+    }
+
+    if (config.metric != null) {
+      problems.push(`premises[${i}]: price 전제에는 check_config.metric을 쓰지 않습니다`);
+    }
+    problems.push(...checkDirection(i, config.kind, config.value, anchorPrice));
   }
 
   for (const [i, c] of v.counterpoints.entries()) {
@@ -95,8 +140,8 @@ export function logForbiddenWords(input: CritiqueRawOutput): void {
 function toCamelCheckConfig(raw: CritiqueRawOutput["premises"][number]["check_config"]): LLMCheckConfig | undefined {
   if (!raw) return undefined;
   const config: LLMCheckConfig = {
+    kind: raw.kind ?? undefined,
     metric: raw.metric ?? undefined,
-    operator: raw.operator ?? undefined,
     value: raw.value ?? undefined,
     period: raw.period ?? undefined,
   };

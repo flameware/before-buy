@@ -73,7 +73,7 @@ async function callWithValidationRetry(input: CritiqueInput): Promise<CritiqueRa
       continue;
     }
 
-    const problems = findSemanticProblems(parsed);
+    const problems = findSemanticProblems(parsed, input.price);
     if (problems.length === 0) return parsed;
     lastProblem = problems.join("; ");
   }

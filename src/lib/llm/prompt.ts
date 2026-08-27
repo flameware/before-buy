@@ -39,6 +39,24 @@ const BASE_SYSTEM_PROMPT = `당신은 개인 투자자가 직접 쓴 투자 근�
    statement에는 전제 내용만 씁니다.
    "자동 확인 불가" 같은 처리 방식은 쓰지 마세요. check_type이 그 역할을 합니다.
 
+   price/valuation 전제에는 check_config.kind로 기준선의 **종류**를 밝힙니다.
+   비교 방향은 종류가 결정하므로 따로 고르지 않습니다.
+
+   - stop-loss: 여기까지는 버틴다는 가격 하한. 아래로 내려가면 생각이 틀어진 것입니다.
+     반드시 현재가보다 **낮은** 값이어야 합니다.
+     사용자가 "-10%"처럼 비율로 답했다면 현재가에 적용해 가격으로 바꿉니다.
+   - value-ceiling: 여기를 넘으면 더는 싸지 않다는 상한.
+     check_type이 valuation이면 metric(per/pbr)과 함께 쓰고,
+     check_type이 price이면 metric 없이 가격 상한으로 씁니다.
+     price 상한은 현재가보다 **높은** 값이어야 합니다.
+   - target-price: 여기까지 오르기를 기대하는 가격.
+     반드시 현재가보다 **높은** 값이어야 합니다.
+
+   stop-loss와 target-price를 헷갈리지 마세요.
+   "틀렸다면 어디서 정리하실 건가요"의 답은 언제나 stop-loss이고,
+   "목표가"의 답은 언제나 target-price입니다.
+   statement 문장은 자유롭게 쓰되, kind가 가리키는 것과 같은 것을 말해야 합니다.
+
 5. 사용자에게 보이는 문장은 일상적인 말투로 씁니다.
    대상 필드: counterpoints[].point, counterpoints[].basis,
              open_questions[], premises[].statement, challenge_reason
@@ -187,12 +205,12 @@ export function buildFewShotMessages(): Anthropic.MessageParam[] {
         {
           statement: "PER 10배 아래를 유지한다",
           check_type: "valuation",
-          check_config: { metric: "per", operator: "lte", value: 10, period: null },
+          check_config: { kind: "value-ceiling", metric: "per", value: 10, period: null },
         },
         {
           statement: "2,000,000원까지 오른다",
           check_type: "price",
-          check_config: { metric: null, operator: "gte", value: 2000000, period: null },
+          check_config: { kind: "target-price", metric: null, value: 2000000, period: null },
         },
       ],
     }),
@@ -220,14 +238,14 @@ export function buildFewShotMessages(): Anthropic.MessageParam[] {
       open_questions: ["240,000원이 깨졌다가 다시 올라오면 어떻게 하실 건가요?"],
       premises: [
         {
-          statement: "240,000원 아래로 내려가지 않는다",
+          statement: "240,000원 아래로 내려가면 정리한다",
           check_type: "price",
-          check_config: { metric: null, operator: "gte", value: 240000, period: null },
+          check_config: { kind: "stop-loss", metric: null, value: 240000, period: null },
         },
         {
           statement: "300,000원까지 오른다",
           check_type: "price",
-          check_config: { metric: null, operator: "gte", value: 300000, period: null },
+          check_config: { kind: "target-price", metric: null, value: 300000, period: null },
         },
       ],
     }),

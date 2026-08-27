@@ -9,33 +9,64 @@ function premise(overrides: Partial<Premise> = {}): Premise {
     id: "p1",
     statement: "테스트 전제",
     checkType: "price",
-    checkConfig: { operator: "lte", value: 80_000 },
+    checkConfig: { kind: "value-ceiling", value: 80_000 },
     status: "pending",
     ...overrides,
   };
 }
 
-describe("resolvePremises — 자동 확인 전제 (price)", () => {
-  it("기준을 만족하면 유지(intact)로 확정하고 관측값을 붙인다", () => {
+describe("resolvePremises — 유지 조건 (price)", () => {
+  it("가격 상한 아래면 유지(intact)로 확정하고 관측값을 붙인다", () => {
     const [p] = resolvePremises([premise()], QUOTE);
     expect(p.status).toBe("intact");
     expect(p.observedValue).toBe("70,000원");
   });
 
-  it("기준을 벗어나면 깨짐(broken)으로 확정한다", () => {
-    const [p] = resolvePremises([premise({ checkConfig: { operator: "lte", value: 60_000 } })], QUOTE);
+  it("가격 상한을 넘으면 깨짐(broken)으로 확정한다", () => {
+    const [p] = resolvePremises([premise({ checkConfig: { kind: "value-ceiling", value: 60_000 } })], QUOTE);
     expect(p.status).toBe("broken");
     expect(p.observedValue).toBe("70,000원");
   });
 
-  it("경계값은 만족으로 본다 — lte는 같아도 유지", () => {
-    const [p] = resolvePremises([premise({ checkConfig: { operator: "lte", value: 70_000 } })], QUOTE);
+  // #85 회귀 잠금: 손절선은 가격이 그 **아래**로 내려갈 때만 깨진다. 방향을 기록하는 쪽이
+  // 고르던 시절, 손절선 위에 있는 종목이 "달라짐"으로 뜨는 버그가 여기서 났다.
+  it("손절선 위에 있으면 유지다 — 하한을 상한처럼 읽지 않는다", () => {
+    const [p] = resolvePremises([premise({ checkConfig: { kind: "stop-loss", value: 63_000 } })], QUOTE);
     expect(p.status).toBe("intact");
   });
 
-  it("gte도 경계값을 만족으로 본다", () => {
-    const [p] = resolvePremises([premise({ checkConfig: { operator: "gte", value: 70_000 } })], QUOTE);
+  it("손절선 아래로 내려가면 깨짐이다", () => {
+    const [p] = resolvePremises([premise({ checkConfig: { kind: "stop-loss", value: 75_000 } })], QUOTE);
+    expect(p.status).toBe("broken");
+  });
+
+  it.each(["value-ceiling", "stop-loss"] as const)("경계값은 지킨 것으로 본다 — %s", (kind) => {
+    const [p] = resolvePremises([premise({ checkConfig: { kind, value: 70_000 } })], QUOTE);
     expect(p.status).toBe("intact");
+  });
+});
+
+describe("resolvePremises — 도달 목표", () => {
+  function target(value: number) {
+    return premise({ checkConfig: { kind: "target-price", value } });
+  }
+
+  // #85: 목표가 미도달은 "생각이 틀어짐"이 아니다. `broken`을 내면 배지가 오염되고
+  // `intact`를 내면 "이 전제는 유효하다"고 거짓말한다 — 그래서 어휘가 따로 있다.
+  it("아직 닿지 않았으면 awaiting — broken도 intact도 아니다", () => {
+    const [p] = resolvePremises([target(90_000)], QUOTE);
+    expect(p.status).toBe("awaiting");
+    expect(p.observedValue).toBe("70,000원");
+  });
+
+  it("닿으면 reached", () => {
+    const [p] = resolvePremises([target(65_000)], QUOTE);
+    expect(p.status).toBe("reached");
+  });
+
+  it("경계값은 도달로 본다", () => {
+    const [p] = resolvePremises([target(70_000)], QUOTE);
+    expect(p.status).toBe("reached");
   });
 
   // #79/#81 회귀 잠금: 시세가 없으면(조회 중이든 조회 실패든) 판정 불가여야 한다.
@@ -55,31 +86,31 @@ describe("resolvePremises — 자동 확인 전제 (price)", () => {
   });
 });
 
-describe("resolvePremises — 자동 확인 전제 (valuation)", () => {
+describe("resolvePremises — 유지 조건 (valuation)", () => {
   function valuation(config: Premise["checkConfig"]): Premise {
     return premise({ checkType: "valuation", checkConfig: config });
   }
 
   it("PER 기준을 만족하면 유지로 확정하고 배수로 표기한다", () => {
-    const [p] = resolvePremises([valuation({ metric: "per", operator: "lte", value: 15 })], QUOTE);
+    const [p] = resolvePremises([valuation({ kind: "value-ceiling", metric: "per", value: 15 })], QUOTE);
     expect(p.status).toBe("intact");
     expect(p.observedValue).toBe("12.0배");
   });
 
   it("PBR 기준을 벗어나면 깨짐으로 확정한다", () => {
-    const [p] = resolvePremises([valuation({ metric: "pbr", operator: "lte", value: 1 })], QUOTE);
+    const [p] = resolvePremises([valuation({ kind: "value-ceiling", metric: "pbr", value: 1 })], QUOTE);
     expect(p.status).toBe("broken");
     expect(p.observedValue).toBe("1.1배");
   });
 
   it("metric이 없으면 판정하지 않는다", () => {
-    const [p] = resolvePremises([valuation({ operator: "lte", value: 15 })], QUOTE);
+    const [p] = resolvePremises([valuation({ kind: "value-ceiling", value: 15 })], QUOTE);
     expect(p.status).toBe("pending");
   });
 
   it("시세에 해당 지표가 없으면 판정하지 않는다 — 시드가 아닌 종목은 PER/PBR이 비어 있다", () => {
     const [p] = resolvePremises(
-      [valuation({ metric: "per", operator: "lte", value: 15 })],
+      [valuation({ kind: "value-ceiling", metric: "per", value: 15 })],
       { price: 70_000, changePercent: 1.2 }
     );
     expect(p.status).toBe("pending");
@@ -116,7 +147,7 @@ describe("resolvePremises — 입력 보존", () => {
       [
         premise({ id: "a" }),
         premise({ id: "b", checkType: "fundamental", status: "manual", checkConfig: undefined }),
-        premise({ id: "c", checkConfig: { operator: "gte", value: 100_000 } }),
+        premise({ id: "c", checkConfig: { kind: "stop-loss", value: 100_000 } }),
       ],
       QUOTE
     );
@@ -146,15 +177,25 @@ describe("hasAutoPremise", () => {
 
 describe("parseCheckConfig", () => {
   it("도메인 타입에 맞는 필드만 남긴다", () => {
-    expect(parseCheckConfig({ metric: "per", operator: "lte", value: 15, extra: "무시" })).toEqual({
+    expect(parseCheckConfig({ kind: "value-ceiling", metric: "per", value: 15, extra: "무시" })).toEqual({
+      kind: "value-ceiling",
       metric: "per",
-      operator: "lte",
       value: 15,
     });
   });
 
   it("알 수 없는 값은 버린다", () => {
-    expect(parseCheckConfig({ metric: "roe", operator: "eq", value: "15" })).toBeUndefined();
+    expect(parseCheckConfig({ kind: "floor", metric: "roe", value: "15" })).toBeUndefined();
+  });
+
+  // 방향을 잃은 기준값은 판정할 수 없다. `resolvePremises`가 `pending`으로 떨어뜨려
+  // 판정 불가를 드러내는 편이, 방향을 임의로 가정하는 것보다 낫다.
+  it("kind가 없으면 남은 값만 살리고 방향은 비운다 — 예전 형식의 행", () => {
+    expect(parseCheckConfig({ operator: "gte", value: 100 })).toEqual({
+      kind: undefined,
+      metric: undefined,
+      value: 100,
+    });
   });
 
   it.each([[null], [undefined], ["문자열"], [42]])("객체가 아니면 undefined (%s)", (raw) => {
@@ -162,9 +203,9 @@ describe("parseCheckConfig", () => {
   });
 
   it("일부 필드만 있어도 그 부분은 살린다", () => {
-    expect(parseCheckConfig({ operator: "gte", value: 100 })).toEqual({
+    expect(parseCheckConfig({ kind: "stop-loss", value: 100 })).toEqual({
+      kind: "stop-loss",
       metric: undefined,
-      operator: "gte",
       value: 100,
     });
   });
