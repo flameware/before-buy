@@ -136,6 +136,60 @@ export function logForbiddenWords(input: CritiqueRawOutput): void {
   }
 }
 
+/** 이 종목에 값이 온 지표. `undefined`면 KIS가 끝내 주지 않는 지표다. */
+export interface AvailableMetrics {
+  per?: number;
+  pbr?: number;
+}
+
+export interface UnavailableMetricPremise {
+  index: number;
+  metric: "per" | "pbr";
+  statement: string;
+}
+
+/**
+ * `metric`이 가리키는 지표가 이 종목에 오지 않는데도 온 valuation 전제를 모은다.
+ * 저장되는 순간부터 영구히 **읽을 수 없음**이 되는 전제다 (#111, #92).
+ *
+ * 판정 단위는 시스템 프롬프트의 지시와 **같은 지표 하나**다 — PER이 없어도 PBR이 왔다면
+ * PBR 기준 전제는 정상이고 잡히지 않는다. 단위가 어긋나면 정상 경로를 오탐한다.
+ *
+ * **`findSemanticProblems`와 섞지 않는다.** 그쪽 반환값은 곧 재시도이고 재시도 실패는
+ * `LLMError`라, PER 없는 종목에서 모델이 고집을 부리면 근거 쓰기 자체가 죽는다 —
+ * 원래 버그보다 나쁜 실패 모드다. 여기서 나온 결과는 경고로만 쓰이고 응답도 전제도
+ * 그대로 통과한다.
+ */
+export function findUnavailableMetricPremises(
+  v: CritiqueRawOutput,
+  metrics: AvailableMetrics
+): UnavailableMetricPremise[] {
+  const found: UnavailableMetricPremise[] = [];
+
+  for (const [index, p] of v.premises.entries()) {
+    if (p.check_type !== "valuation") continue;
+    const metric = p.check_config?.metric;
+    if (metric == null || metrics[metric] != null) continue;
+    found.push({ index, metric, statement: p.statement });
+  }
+
+  return found;
+}
+
+/**
+ * 없는 지표를 쓴 저평가선 전제를 콘솔에 남긴다. `logForbiddenWords`와 같은 계열 —
+ * 잡아내되 흐름을 실패시키지 않는다. 코드로 막지 않기로 한 이상(prompt.ts의
+ * `UNAVAILABLE_METRIC_RULE` 주석) 지시를 어긴 응답을 아무도 모르는 상태로 두지 않기 위한 층이다.
+ */
+export function logUnavailableMetricPremises(v: CritiqueRawOutput, metrics: AvailableMetrics): void {
+  for (const { index, metric, statement } of findUnavailableMetricPremises(v, metrics)) {
+    console.warn(
+      `[llm/critique] 이 종목에 ${metric.toUpperCase()}가 없는데 저평가선 전제가 왔습니다 — ` +
+        `premises[${index}]: "${statement}" (판정되지 않고 읽을 수 없음으로 남는다)`
+    );
+  }
+}
+
 /** 형식 스키마의 null을 도메인 타입의 undefined로 되돌린다. */
 function toCamelCheckConfig(raw: CritiqueRawOutput["premises"][number]["check_config"]): LLMCheckConfig | undefined {
   if (!raw) return undefined;
