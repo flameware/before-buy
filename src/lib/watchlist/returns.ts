@@ -1,6 +1,6 @@
-// S5 헤더가 그리는 두 수익률 — **기준이 다른 두 값**이 사는 곳.
+// S5 `가격 흐름`이 점선 아래에 그리는 두 수익률 — **기준이 다른 두 값**이 사는 곳.
 //
-// 이 파일이 생긴 이유(#86): 헤더의 "담은 날 대비" 자리에 `QuoteSnapshot.changePercent`
+// 이 파일이 생긴 이유(#86): "담은 날 대비" 자리에 `QuoteSnapshot.changePercent`
 // (KIS `prdy_ctrt` — **전일 대비**)가 그대로 배선되어 있었다. 관심종목에서는 `담은 날 →
 // 현재` 옆에 붙어 담은 날 대비로 읽혔고, 보유중에서는 아예 `근거 대비`라는 이름표를 달고
 // 나갔다. 두 가격이 같은데 `-1.7%`가 붙는 화면이 그렇게 나온다.
@@ -26,7 +26,7 @@ function percentAgainst(currentPrice: number, basePrice: number | null | undefin
   return ((currentPrice - basePrice) / basePrice) * 100;
 }
 
-/** 담은 날 가격 대비. 화면 문구로는 **근거 대비** — 근거가 아직 유효한지를 보는 기준이다. */
+/** **담은 날 대비** — 근거가 아직 유효한지를 보는 기준이다. 화면 문구도 같은 이름을 쓴다(#127). */
 export function returnSinceAdded(currentPrice: number, addedPrice: number | null | undefined): number | null {
   return percentAgainst(currentPrice, addedPrice);
 }
