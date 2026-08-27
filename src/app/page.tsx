@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
 import { splitByStatus, type BadgeState } from "@/lib/mock";
 import { badgeDisplay, badgeLabel, countByJudgment } from "@/lib/premises/badge";
+import { useChangeSummaryToast } from "@/hooks/use-change-summary-toast";
 import { useWatchlistView } from "@/hooks/use-watchlist-view";
 import type { WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
 
@@ -177,14 +178,11 @@ export default function Home() {
   const { items: watchlist, isLoading: loading } = useWatchlistView(scenario, hydrated);
 
   const { watching, bought } = splitByStatus(watchlist);
-  // 달라짐과 판정 불가를 한 번에 센다 — 빨간 배너는 판정된 것만 세고, 시세를 못 불러와
-  // 판정하지 못한 종목은 그 아래 줄이 따로 말한다. 예전에는 후자가 "유지 중"으로 접혀
-  // 배너 자체가 조용히 사라졌다(#81).
+  // 달라짐과 판정 불가를 한 번에 센다 — 변동 요약 토스트는 판정된 것만 세고, 시세를 못
+  // 불러와 판정하지 못한 종목은 헤더의 정적 줄이 따로 말한다. 예전에는 후자가 "유지 중"으로
+  // 접혀 요약 자체가 조용히 사라졌다(#81).
   const { changed: numChanged, unknown: numUnknown } = countByJudgment(watchlist);
-  const firstChanged = watchlist.find((i) => {
-    const display = badgeDisplay(i, i.quote);
-    return display.kind === "badge" && display.state === "changed";
-  });
+  useChangeSummaryToast(numChanged);
 
   useEffect(() => {
     if (!highlightTicker) return;
@@ -204,23 +202,23 @@ export default function Home() {
         <div className="flex items-center justify-between">
           <h1 className="text-base font-semibold">관심종목</h1>
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            {/* 이 뱃지가 가리키는 것은 값이 아니라 **토글이라는 장치 자체**라 On/Off와 무관하게
+                상시 노출한다 — 오해는 Off 상태에서 라벨만 보일 때 생긴다(#103). */}
+            <Badge variant="outline" className="font-normal text-muted-foreground">
+              데모용
+            </Badge>
             3개월 후 보기
             <Switch checked={hydrated && scenario === "future"} onCheckedChange={toggle} />
           </label>
         </div>
         {scenario === "future" ? (
           <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-            지금 보고 계신 가격·전제 상태는 시드 종목의 3개월 후 상황을 가정한 데모 값입니다.
+            서비스 컨셉 데모를 위해 3개월 후 상황을 가정한 값을 보여드립니다
           </p>
         ) : null}
-        {numChanged > 0 ? (
-          <Link
-            href={`/stocks/${firstChanged?.ticker ?? ""}`}
-            className="rounded-lg bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive"
-          >
-            {numChanged}개 종목에서 달라진 점이 있어요
-          </Link>
-        ) : null}
+        {/* 달라짐 요약은 헤더에 상주하지 않고 토스트로 지나간다(#103, useChangeSummaryToast).
+            반면 아래 "시세를 불러오지 못해"는 사건이 아니라 풀리기 전까지 계속 참인 상태라
+            정적 텍스트로 남는다 — 사라지면 "왜 이 카드엔 배지가 없지"에 답할 문장이 없어진다. */}
         {numUnknown > 0 ? (
           <p className="text-xs text-muted-foreground">
             {numUnknown}개 종목은 시세를 불러오지 못해 확인할 수 없어요

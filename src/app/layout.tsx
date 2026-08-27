@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { PhoneFrame } from "@/components/layout/phone-frame";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { ToastProvider } from "@/components/ui/toast";
 
 const geistHeading = Geist({subsets:['latin'],variable:'--font-heading'});
 
@@ -32,7 +33,9 @@ export default function RootLayout({ children, modal }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <QueryProvider>
-          <PhoneFrame modal={modal}>{children}</PhoneFrame>
+          <ToastProvider>
+            <PhoneFrame modal={modal}>{children}</PhoneFrame>
+          </ToastProvider>
         </QueryProvider>
       </body>
     </html>
