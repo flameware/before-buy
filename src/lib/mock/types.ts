@@ -77,7 +77,14 @@ export interface FollowupAnswer {
 export interface Stock {
   ticker: string;
   name: string;
-  sector: string;
+  /**
+   * 큐레이션된 한국어 업종 라벨. **데모 화이트리스트 27종에만 있다** — 상장 종목의
+   * 출처인 KIS 종목 마스터는 종목코드와 이름만 주기 때문이다(ADR-0008).
+   *
+   * 없는 것이 정상이므로 빈 문자열이나 "기타" 같은 값으로 메우지 않는다. 화면은 그 자리를
+   * 비우고, LLM 프롬프트는 괄호째 뺀다 — 모르는 업종을 지어내면 반론의 근거가 오염된다.
+   */
+  sector?: string;
   exchange: "KOSPI" | "KOSDAQ";
 }
 

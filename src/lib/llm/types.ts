@@ -15,7 +15,8 @@ export interface CritiqueInput {
   sessionId: string;
   ticker: string;
   stockName: string;
-  sector: string;
+  /** 데모 화이트리스트 27종에만 있다. 없으면 프롬프트에서 괄호째 빠진다 (#92). */
+  sector?: string;
   category: ThesisCategory;
   /** 후속 질문 프롬프트와 답변(건너뜀 포함)을 이미 사람이 읽을 문자열로 변환한 것. */
   followupSummary: string;

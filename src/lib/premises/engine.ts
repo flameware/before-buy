@@ -69,34 +69,62 @@ interface CheckResult {
 /** 시세를 더 기다리면 풀릴 자리. 관측값은 아직 없다. */
 const WAITING: CheckResult = { status: "pending" };
 
-/** 사용자가 근거를 다시 쓰기 전에는 풀리지 않는 자리 (#88). */
+/** 기다려서는 풀리지 않는 자리 (#88). */
 const UNREADABLE: CheckResult = { status: "unreadable" };
 
 /**
- * 판정이 안 나올 때 그 이유를 갈라 돌려준다. **시세가 없어서**면 `pending`,
- * **설정을 읽을 수 없어서**면 `unreadable` — 앞은 기다리면 풀리고 뒤는 그렇지 않다.
- * 한 값으로 뭉개면 화면이 영구 판정 불가에도 "잠시 기다리는 중"처럼 안내하게 된다.
+ * 판정이 안 나올 때 그 이유를 갈라 돌려준다. **기다리면 풀리는가**가 유일한 기준이다 —
+ * 풀리면 `pending`, 안 풀리면 `unreadable`. 한 값으로 뭉개면 화면이 영구 판정 불가에도
+ * "잠시 기다리는 중"처럼 안내하게 된다.
  *
- * 시세에 PER·PBR이 없는 경우는 `pending`이다. 전제의 설정이 아니라 시세 쪽이 비어 있는
- * 것이라, 근거를 다시 써도 풀리지 않는다.
+ * **가르는 것은 원인이 아니라 회복 가능성이다** (#92). 시세를 아직 못 받은 것은 `pending`
+ * (다음 조회에서 풀린다). 시세는 왔는데 PER·PBR이 비어 있는 것은 `unreadable`이다 —
+ * 적자기업·신규상장처럼 KIS가 그 값을 끝내 주지 않는 종목이 있고, 기다려도 오지 않는다.
+ *
+ * 이 구분은 검색이 상장 종목 전체로 넓어지면서 실질이 생겼다: 데모 화이트리스트 27종은
+ * 전부 대형주라 PER·PBR이 항상 나왔고, 그래서 "PER 없음 = 아직 안 왔음"이 우연히 참이었다.
  */
+/**
+ * 전제의 **설정**만으로 판정 준비가 끝났는가. 시세는 보지 않는다.
+ *
+ * `unreadable`은 한 상태지만 사용자가 할 수 있는 일은 둘로 갈린다 — 설정을 못 읽는 것은
+ * 근거를 다시 쓰면 풀리고, 시세에 지표가 없는 것은 그래도 안 풀린다. 화면이 그 둘에
+ * 다른 안내를 하려면 이 술어가 필요하다(`display.ts`). 상태를 하나 더 만드는 대신
+ * 술어를 내보내는 이유: 배지 판정은 두 경우가 완전히 같기 때문이다 (#92).
+ */
+export function isConfigReadable(
+  checkType: Premise["checkType"],
+  config: PremiseCheckConfig | undefined
+): boolean {
+  if (config?.kind == null || config.value == null) return false;
+  if (checkType === "valuation") return Boolean(config.metric);
+  return true;
+}
+
 function evaluateCheck(
   checkType: Premise["checkType"],
   config: PremiseCheckConfig | undefined,
   quote: QuoteSnapshot | null
 ): CheckResult {
-  if (config?.kind == null || config.value == null) return UNREADABLE;
+  if (!isConfigReadable(checkType, config)) return UNREADABLE;
+  // 위에서 이미 확인했다. 여기는 타입을 좁히기 위한 재확인일 뿐이다 —
+  // 판정 기준은 `isConfigReadable` 한 곳에만 산다.
+  const kind = config?.kind;
+  const value = config?.value;
+  if (kind == null || value == null) return UNREADABLE;
+
   if (!quote) return WAITING;
 
   if (checkType === "price") {
-    return judge(quote.price, config.kind, config.value, formatWon);
+    return judge(quote.price, kind, value, formatWon);
   }
 
   if (checkType === "valuation") {
-    if (!config.metric) return UNREADABLE;
+    if (!config?.metric) return UNREADABLE;
     const observed = quote[config.metric];
-    if (observed == null) return WAITING;
-    return judge(observed, config.kind, config.value, formatMultiple);
+    // 시세는 왔는데 이 지표만 비었다 — 기다려서 풀릴 자리가 아니다 (#92).
+    if (observed == null) return UNREADABLE;
+    return judge(observed, kind, value, formatMultiple);
   }
 
   return UNREADABLE;

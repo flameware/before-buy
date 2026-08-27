@@ -120,14 +120,36 @@ describe("resolvePremises — 유지 조건 (valuation)", () => {
     expect(p.status).toBe("unreadable");
   });
 
-  // 여기는 전제가 아니라 시세 쪽이 비어 있다 — 근거를 다시 써도 풀리지 않으므로
-  // `unreadable`이 아니라 `pending`이다.
-  it("시세에 해당 지표가 없으면 판정하지 않는다 — 시드가 아닌 종목은 PER/PBR이 비어 있다", () => {
+  // 원인이 아니라 회복 가능성으로 가른다 (#92). 여기서 비어 있는 것은 전제가 아니라
+  // 시세 쪽이지만, 적자기업·신규상장은 KIS가 PER을 끝내 주지 않으므로 기다려도 오지
+  // 않는다. `pending`으로 두면 화면이 영원히 "잠시 기다리는 중"이라고 안내한다.
+  it("시세는 왔는데 지표가 비면 unreadable이다 — 기다려도 오지 않는 값이 있다", () => {
     const [p] = resolvePremises(
       [valuation({ kind: "value-ceiling", metric: "per", value: 15 })],
       { price: 70_000, changePercent: 1.2 }
     );
+    expect(p.status).toBe("unreadable");
+  });
+
+  // 위와 짝을 이루는 대조군. 이쪽은 다음 조회에서 풀리므로 `pending`이 맞다 —
+  // 둘이 갈라져 있다는 사실 자체를 잠근다.
+  it("시세를 아직 못 받았으면 pending이다 — 이쪽은 기다리면 풀린다", () => {
+    const [p] = resolvePremises(
+      [valuation({ kind: "value-ceiling", metric: "per", value: 15 })],
+      null
+    );
     expect(p.status).toBe("pending");
+  });
+
+  // 배지 보장: unreadable은 broken이 아니므로 "달라짐"에 투표하지 않는다.
+  // PER을 안 주는 종목이 통째로 "달라짐"으로 뜨면 이 변경이 만든 최악의 회귀가 된다.
+  it("지표가 비어도 배지에는 투표하지 않는다", () => {
+    const [p] = resolvePremises(
+      [valuation({ kind: "value-ceiling", metric: "per", value: 15 })],
+      { price: 70_000, changePercent: 1.2 }
+    );
+    expect(p.status).not.toBe("broken");
+    expect(p.observedValue).toBeUndefined();
   });
 });
 

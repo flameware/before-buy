@@ -7,7 +7,7 @@
 // 테스트로 잠글 수 있다 (ADR-0006).
 
 import type { Premise } from "../mock/types";
-import { isAutoCheck } from "./engine";
+import { isAutoCheck, isConfigReadable } from "./engine";
 
 /** "자동 확인" / "직접 확인 필요" 두 배지 (CONTEXT.md). */
 export type PremiseBadge = "auto" | "manual";
@@ -43,7 +43,12 @@ function bodyFor(premise: Premise, quotePending: boolean): PremiseBody {
   // 시세보다 먼저 본다. `unreadable`은 시세와 무관하게 확정이라 기다릴 이유가 없고,
   // 이걸 스켈레톤 뒤에 숨기면 배지는 "직접 확인 필요"인데 문구는 로딩 중인 한 박자가 생긴다.
   if (premise.status === "unreadable") {
-    return { kind: "note", text: "이 조건을 시스템이 읽지 못해요 — 근거를 다시 써주세요." };
+    // 상태는 하나지만 사용자가 할 수 있는 일은 둘로 갈린다 (#92). 설정을 못 읽는 것은
+    // 근거를 다시 쓰면 풀리고, 시세가 그 지표를 주지 않는 것은 다시 써도 안 풀린다 —
+    // 적자기업에 "근거를 다시 써주세요"라고 하면 사용자는 똑같은 결과를 받으러 갔다 온다.
+    return isConfigReadable(premise.checkType, premise.checkConfig)
+      ? { kind: "note", text: "이 종목은 이 지표가 제공되지 않아 직접 확인이 필요해요." }
+      : { kind: "note", text: "이 조건을 시스템이 읽지 못해요 — 근거를 다시 써주세요." };
   }
 
   if (isAutoCheck(premise.checkType) && premise.status === "pending") {

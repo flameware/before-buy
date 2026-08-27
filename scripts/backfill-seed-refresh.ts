@@ -19,7 +19,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../src/lib/db";
 import { critiques, premises, theses, watchlistItems } from "../src/lib/db/schema";
-import { findStock } from "../src/lib/mock/stock-universe";
+import { findDemoStock } from "../src/lib/mock/demo-whitelist";
 import { SEED_ITEMS } from "../src/lib/mock/seed-data";
 
 const SEED_D = SEED_ITEMS.find((s) => s.id === "seed-d")!;
@@ -101,7 +101,7 @@ async function insertMissingSeedItems() {
   const sessionIds = [...new Set(sessions.map((s) => s.sessionId))];
 
   for (const seed of NEW_SEED_ITEMS) {
-    const stock = findStock(seed.ticker);
+    const stock = findDemoStock(seed.ticker);
     if (!stock) throw new Error(`Unknown seed ticker: ${seed.ticker}`);
 
     let inserted = 0;

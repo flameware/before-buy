@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { db } from "./index";
 import { critiques, premises, theses, watchlistItems } from "./schema";
 import { SEED_ITEMS, SEED_PREMISE_CHECK_CONFIG } from "../mock/seed-data";
-import { findStock } from "../mock/stock-universe";
+import { findDemoStock } from "../mock/demo-whitelist";
 
 /**
  * 시드 A/B/C/D/E를 세션의 실제 row로 심는다. DB에는 "현재" 값만 저장한다 — "3개월 후"
@@ -17,7 +17,9 @@ export async function provisionSeedItems(sessionId: string): Promise<void> {
   const queries: unknown[] = [];
 
   for (const seed of SEED_ITEMS) {
-    const stock = findStock(seed.ticker);
+    // 시드는 손으로 고른 종목이므로 언제나 데모 화이트리스트 안에 있다 — 여기서
+    // 못 찾으면 시드 정의가 깨진 것이라 던지는 게 맞다 (검색 경로와 달리).
+    const stock = findDemoStock(seed.ticker);
     if (!stock) throw new Error(`Unknown seed ticker: ${seed.ticker}`);
 
     const watchlistItemId = randomUUID();

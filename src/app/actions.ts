@@ -7,6 +7,9 @@ import type { CritiqueOutput } from "@/lib/llm/types";
 import { getWatchlistListView, getWatchlistQuoteMap, type SettledWatchlistItem, type WatchlistListItem } from "@/lib/watchlist/get-watchlist";
 import { getWatchlistItemDetail, getWatchlistItemForOrder, removeWatchlistItem } from "@/lib/watchlist/get-watchlist-item";
 import { recordOrderEvent, recordOrderEventByTicker, type OrderEventInput } from "@/lib/order/record-order-event";
+import { getListedStocks } from "@/lib/kis/stock-master";
+import { SEARCH_RESULT_LIMIT, searchStockMaster } from "@/lib/kis/stock-master-parse";
+import type { Stock } from "@/lib/mock/types";
 import type { DemoScenario, QuoteSnapshot, Thesis } from "@/lib/mock/types";
 
 /**
@@ -79,4 +82,16 @@ export async function getWatchlistItemDetailAction(
 /** S5 "관심종목에서 제외": watchlist_items.status를 'removed'로 실제 update한다. */
 export async function removeWatchlistItemAction(ticker: string): Promise<void> {
   return removeWatchlistItem(ticker);
+}
+
+/**
+ * S1.5 종목 검색 — 상장 종목 전체를 대상으로 한다 (#92, ADR-0008).
+ *
+ * 마스터를 읽지 못하면 `getListedStocks`가 빈 배열을 돌려주므로 결과도 비어 있다.
+ * 던지지 않는 게 중요하다 — Server Action이 throw하면 클라이언트 promise가 reject되지
+ * 않고 쿼리가 영원히 pending에 머문다(#82·#83, 미해결).
+ */
+export async function searchStocksAction(query: string): Promise<Stock[]> {
+  const stocks = await getListedStocks();
+  return searchStockMaster(stocks, query, SEARCH_RESULT_LIMIT);
 }

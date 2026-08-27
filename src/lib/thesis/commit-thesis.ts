@@ -13,7 +13,7 @@ import { db } from "@/lib/db";
 import { critiques, premises, theses, watchlistItems } from "@/lib/db/schema";
 import { withSession } from "@/lib/db/session";
 import type { CritiqueOutput } from "@/lib/llm/types";
-import { findStock } from "@/lib/mock/stock-universe";
+import { resolveStock } from "@/lib/stock/resolve-stock";
 import type { QuoteSnapshot } from "@/lib/mock/types";
 import type { ThesisDraftInput } from "./generate-result";
 
@@ -26,8 +26,9 @@ export async function commitThesis(
   quote: QuoteSnapshot
 ): Promise<void> {
   return withSession(async (sessionId) => {
-    const stock = findStock(ticker);
-    if (!stock) throw new Error(`Unknown ticker: ${ticker}`);
+    // 여기까지 왔다는 건 S3가 시세를 받아냈다는 뜻이라 종목은 실재한다. 이름만
+    // 모를 수 있고, 그때는 티커가 그대로 `watchlist_items.name`에 들어간다 (#92).
+    const stock = await resolveStock(ticker);
 
     const watchlistItemId = randomUUID();
     const thesisId = randomUUID();
