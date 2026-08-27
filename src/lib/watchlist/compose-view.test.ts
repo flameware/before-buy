@@ -12,7 +12,7 @@ const BROKEN_WHEN_PRICED: Premise = {
   id: "p1",
   statement: "60,000원 이하 유지",
   checkType: "price",
-  checkConfig: { operator: "lte", value: 60_000 },
+  checkConfig: { kind: "value-ceiling", value: 60_000 },
   status: "intact", // DB에 남아 있던 낡은 값 — 판정에 쓰이면 안 된다.
 };
 

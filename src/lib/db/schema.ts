@@ -71,7 +71,7 @@ export const premises = pgTable("premises", {
     .references(() => theses.id, { onDelete: "cascade" }),
   statement: text("statement").notNull(),
   checkType: text("check_type").notNull(), // price | valuation | fundamental | qualitative
-  checkConfig: jsonb("check_config"), // {metric, operator, value, period}
+  checkConfig: jsonb("check_config"), // {kind, metric, value, period} — 방향은 kind가 결정 (ADR-0007)
   // ADR-0004: status/observed_value는 fundamental|qualitative 전제에만 의미가 있다.
   // price|valuation 전제는 저장된 값을 무시하고 조회 시 시세로 계산한다.
   status: text("status").notNull(), // intact | broken | pending | manual

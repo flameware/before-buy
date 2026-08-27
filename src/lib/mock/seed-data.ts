@@ -131,8 +131,10 @@ const SEED_B: SeedItem = {
           statement: "목표가 210,000원",
           checkType: "price",
         },
-        current: { status: "intact", observedValue: "143,500원" },
-        future: { status: "intact", observedValue: "195,800원" },
+        // 도달 목표라 `intact`/`broken`이 아니다 — 210,000원에 아직 닿지 않았을 뿐이고,
+        // 그 사실은 배지에 투표하지 않는다 (#85).
+        current: { status: "awaiting", observedValue: "143,500원" },
+        future: { status: "awaiting", observedValue: "195,800원" },
       },
       {
         base: {
