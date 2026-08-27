@@ -37,11 +37,16 @@ const QUOTES_TIMEOUT_MS = 10_000;
  * 두 호출부(S1 목록 / S4·S5 1건)가 같은 쿼리 키에 같은 `queryFn`과 같은 재시도 정책을
  * 쓴다 — 한쪽만 방어하면 같은 캐시를 다른 규칙으로 채우게 된다.
  *
- * **재시도하지 않는다.** 기본값(`retry: 3`, 백오프 1·2·4초)이면 매 시도가 타임아웃까지
- * 10초를 채워 쿼리가 `isError`에 닿기까지 ~47초가 걸린다 — 실측으로 확인했다. 그동안
- * 화면은 여전히 skeleton이라 방어가 사실상 없는 것과 같다. 게다가 여기까지 온 실패는
- * 이미 서버 쪽 `try/catch`(`loadWatchlistQuotes`)를 통과한 것들이라 한 번 더 부른다고
- * 달라질 가능성이 낮고, `staleTime`이 20초라 다음 자연스러운 재검증이 곧 다시 시도한다.
+ * **재시도하지 않는다.** React Query의 재시도는 `document.visibilityState`가 `hidden`이면
+ * **무한정 멈춘다** — retryer의 `canContinue()`가 `focusManager.isFocused()`를 요구한다
+ * (`@tanstack/query-core/src/retryer.ts`). 그래서 기본값(`retry: 3`)이면 배경 탭에서
+ * 쿼리가 `isError`에 영영 닿지 않고, 탭으로 돌아와야 풀린다. 타임아웃만으로는 이것을
+ * 못 넘는다 — 타임아웃이 만든 리젝션도 재시도 대상이 되어 같은 자리에서 멈추기 때문이다.
+ * 재시도가 없으면 멈출 것도 없다 (#83).
+ *
+ * 잃는 것은 적다. 여기까지 온 실패는 이미 서버 쪽 `try/catch`(`loadWatchlistQuotes`)를
+ * 통과한 것들이라 한 번 더 불러 달라질 가능성이 낮고, `staleTime`이 20초라 다음
+ * 자연스러운 재검증이 곧 다시 시도한다.
  */
 const QUOTES_QUERY_DEFAULTS = { staleTime: QUOTES_STALE_TIME_MS, retry: false } as const;
 
