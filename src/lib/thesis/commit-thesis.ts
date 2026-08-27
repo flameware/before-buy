@@ -14,17 +14,25 @@ import { critiques, premises, theses, watchlistItems } from "@/lib/db/schema";
 import { withSession } from "@/lib/db/session";
 import type { CritiqueOutput } from "@/lib/llm/types";
 import { resolveStock } from "@/lib/stock/resolve-stock";
-import type { QuoteSnapshot } from "@/lib/mock/types";
+import type { Premise, QuoteSnapshot } from "@/lib/mock/types";
+import type { SettledWatchlistItem } from "@/lib/watchlist/get-watchlist";
 import type { ThesisDraftInput } from "./generate-result";
 
 const AUTO_CHECK_TYPES = new Set(["price", "valuation"]);
 
+/**
+ * 담은 행을 근거·전제까지 붙여 그대로 돌려준다 (#107, ADR-0010). 심을 값이 이미 전부 이
+ * 함수 안에 있으므로 DB를 다시 읽지 않는다. 전제는 **저장된 그대로**(price/valuation은
+ * `pending`) 돌려준다 — 자동 전제의 status를 시세와 만나 확정하는 일은 화면 쪽
+ * `composeView`가 맡는다(ADR-0004). 여기서 미리 확정해 돌려주면 목록 조회가 돌려주는
+ * 모양과 어긋난다.
+ */
 export async function commitThesis(
   ticker: string,
   draft: ThesisDraftInput,
   critique: CritiqueOutput,
   quote: QuoteSnapshot
-): Promise<void> {
+): Promise<SettledWatchlistItem> {
   return withSession(async (sessionId) => {
     // 여기까지 왔다는 건 S3가 시세를 받아냈다는 뜻이라 종목은 실재한다. 이름만
     // 모를 수 있고, 그때는 티커가 그대로 `watchlist_items.name`에 들어간다 (#92).
@@ -32,6 +40,19 @@ export async function commitThesis(
 
     const watchlistItemId = randomUUID();
     const thesisId = randomUUID();
+    const addedAt = new Date();
+    const createdAt = new Date();
+
+    // 전제 id도 미리 만든다 — 예전에는 `defaultRandom()`에 맡겼지만, 그러면 방금 심은
+    // 전제를 돌려주기 위해 DB를 다시 읽어야 한다. 같은 파일의 watchlistItemId/thesisId가
+    // 이미 쓰는 패턴이다.
+    const storedPremises: Premise[] = critique.premises.map((p) => ({
+      id: randomUUID(),
+      statement: p.statement,
+      checkType: p.checkType,
+      checkConfig: p.checkConfig ?? undefined,
+      status: AUTO_CHECK_TYPES.has(p.checkType) ? "pending" : "manual",
+    }));
 
     const queries: unknown[] = [
       db.insert(watchlistItems).values({
@@ -41,11 +62,12 @@ export async function commitThesis(
         name: stock.name,
         status: "watching",
         addedPrice: String(quote.price),
-        addedAt: new Date(),
+        addedAt,
         isSeed: false,
       }),
       db.insert(theses).values({
         id: thesisId,
+        createdAt,
         watchlistItemId,
         category: draft.category,
         followup: draft.followup,
@@ -62,20 +84,44 @@ export async function commitThesis(
 
     // gut 카테고리는 전제가 0개일 수 있음(mock generatePremises와 동일 관례) — 빈
     // VALUES insert는 보내지 않는다.
-    if (critique.premises.length > 0) {
+    if (storedPremises.length > 0) {
       queries.push(
         db.insert(premises).values(
-          critique.premises.map((p) => ({
+          storedPremises.map((p) => ({
+            id: p.id,
             thesisId,
             statement: p.statement,
             checkType: p.checkType,
             checkConfig: p.checkConfig ?? null,
-            status: AUTO_CHECK_TYPES.has(p.checkType) ? "pending" : "manual",
+            status: p.status,
           }))
         )
       );
     }
 
     await db.batch(queries as unknown as Parameters<typeof db.batch>[0]);
+
+    return {
+      id: watchlistItemId,
+      ticker,
+      name: stock.name,
+      status: "watching",
+      isSeed: false,
+      addedPrice: quote.price,
+      addedAt: addedAt.toISOString(),
+      thesis: {
+        category: draft.category,
+        followup: draft.followup,
+        freeText: draft.freeText ?? undefined,
+        createdAt: createdAt.toISOString(),
+        critique: {
+          isChallengeable: critique.isChallengeable,
+          counterpoints: critique.counterpoints,
+          openQuestions: critique.openQuestions,
+        },
+        premises: storedPremises,
+      },
+      quote,
+    };
   });
 }

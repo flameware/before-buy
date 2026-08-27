@@ -7,8 +7,14 @@ import {
   loadWatchlistList,
   loadWatchlistQuotes,
 } from "@/app/actions";
-import type { DemoScenario, QuoteSnapshot } from "@/lib/mock/types";
+import type { DemoScenario } from "@/lib/mock/types";
 import { QUOTE_FAILED, QUOTE_LOADING, settledQuote, type QuoteState } from "@/lib/quote/quote-state";
+import {
+  quotesKey,
+  toTickerKey,
+  WATCHLIST_LIST_KEY as LIST_KEY,
+  type QuoteMap,
+} from "@/lib/watchlist/cache";
 import { composeView } from "@/lib/watchlist/compose-view";
 import type { SettledWatchlistItem, WatchlistListItem } from "@/lib/watchlist/get-watchlist";
 
@@ -16,34 +22,28 @@ import type { SettledWatchlistItem, WatchlistListItem } from "@/lib/watchlist/ge
 const LIST_STALE_TIME_MS = 60_000;
 const QUOTES_STALE_TIME_MS = 20_000;
 
-const LIST_KEY = ["watchlist", "list"] as const;
-
-function quotesKey(scenario: DemoScenario, tickerKey: string) {
-  return ["watchlist", "quotes", scenario, tickerKey] as const;
-}
-
-function toTickerKey(items: { ticker: string }[]): string {
-  return items
-    .map((i) => i.ticker)
-    .sort()
-    .join(",");
-}
-
 /**
  * 시세 쿼리의 상태를 종목 하나의 시세 상태로 옮긴다. 실패는 두 경로로 온다 — 쿼리 전체
  * reject와 응답 안에서 그 티커만 `null`인 경우(KIS 개별 조회 실패) — 둘 다 `failed`로
  * 접는다. 사용자가 취할 행동이 같기 때문이다.
  *
- * `isFetching`이 아니라 "데이터가 아직 없음"만 `loading`으로 본다. 캐시된 값이 있는
+ * `isFetching`이 아니라 "이 티커의 결과가 아직 없음"만 `loading`으로 본다. 캐시된 값이 있는
  * 재검증 중에는 이전 값을 그대로 보여준다 — 캐시를 나눈 목적이 그것이다(ADR-0002).
+ *
+ * 맵에 **자리가 없는 것**과 자리가 `null`인 것을 가른다. 담기/제외 직후에는 이전 키에서
+ * 이월된 시세가 먼저 들어와 있을 수 있고(`cache.ts`), 그 맵에 아직 없는 티커는 조회에
+ * 실패한 것이 아니라 결과가 아직 오지 않은 것이다. 조회가 끝났는데도(`!isFetching`)
+ * 자리가 없다면 그때는 실패다 — 결판난 뒤에도 기다리는 척하지 않는다.
  */
 function quoteStateFor(
   ticker: string,
-  data: Record<string, QuoteSnapshot | null> | undefined,
-  isError: boolean
+  data: QuoteMap | undefined,
+  isError: boolean,
+  isFetching: boolean
 ): QuoteState {
-  if (data) return settledQuote(data[ticker]);
-  return isError ? QUOTE_FAILED : QUOTE_LOADING;
+  if (data && ticker in data) return settledQuote(data[ticker]);
+  if (isError) return QUOTE_FAILED;
+  return data && !isFetching ? QUOTE_FAILED : QUOTE_LOADING;
 }
 
 /**
@@ -77,9 +77,13 @@ export function useWatchlistView(scenario: DemoScenario, hydrated: boolean) {
 
   const quotesData = quotesQuery.data;
   const quotesError = quotesQuery.isError;
+  const quotesFetching = quotesQuery.isFetching;
   const items = useMemo(
-    () => listItems.map((item) => composeView(item, quoteStateFor(item.ticker, quotesData, quotesError))),
-    [listItems, quotesData, quotesError]
+    () =>
+      listItems.map((item) =>
+        composeView(item, quoteStateFor(item.ticker, quotesData, quotesError, quotesFetching))
+      ),
+    [listItems, quotesData, quotesError, quotesFetching]
   );
 
   // 하이드레이션 전에는 `enabled: false`라 `isLoading`이 `false`다(v5의 `isLoading`은
@@ -158,7 +162,7 @@ export function useWatchlistItemView(
     return {
       status: "ready" as ItemViewStatus,
       listItem: cachedItem,
-      quote: quoteStateFor(ticker, quotesQuery.data, quotesQuery.isError),
+      quote: quoteStateFor(ticker, quotesQuery.data, quotesQuery.isError, quotesQuery.isFetching),
       // 재검증이 끝나야 고정해도 되는 값이 된다.
       quoteSettled: !quotesQuery.isFetching,
     };

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
@@ -25,6 +26,7 @@ import { returnSinceAdded, returnSinceBuy } from "@/lib/watchlist/returns";
 import { premiseDisplay } from "@/lib/premises/display";
 import { getCategory, type FollowupAnswer, type Premise } from "@/lib/mock";
 import { removeWatchlistItemAction } from "@/app/actions";
+import { applyWatchlistRemoved, WATCHLIST_LIST_KEY } from "@/lib/watchlist/cache";
 
 const priceFormat = new Intl.NumberFormat("ko-KR");
 
@@ -90,6 +92,7 @@ function PremiseRow({ premise, quotePending }: { premise: Premise; quotePending:
 export function StockDetailView({ ticker, stockName }: { ticker: string; stockName: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [removing, startRemove] = useTransition();
   const { scenario, hydrated } = useDemoScenario();
   const notifyUnsupportedTrade = useUnsupportedTradeToast();
 
@@ -155,12 +158,24 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
     router.push(`/order/${ticker}`);
   }
 
+  /**
+   * "관심종목에서 제외". **응답을 기다렸다가 이동한다.** 예전에는 기다리지 않고 먼저
+   * 이동해, 뺀 종목이 홈 목록에 남아 있다가 재검증이 끝나면 사라졌다 (#107).
+   *
+   * 기다림이 없어지는 게 아니라 자리를 옮긴 것이다 — 확인 다이얼로그를 막 지난 이 자리의
+   * 대기는 "내 행동이 처리되는 중"으로 읽히지만, 홈에 돌아온 뒤의 같은 대기는 "화면이
+   * 틀렸다"로 읽힌다. `건너뛰기`가 같은 이유로 같은 선택을 한다(`thesis-flow.tsx`).
+   */
   function handleRemove() {
-    void removeWatchlistItemAction(ticker).then(() =>
-      // ADR-0002: 종목이 빠졌으니 S1 목록 캐시를 무효화해 복귀 시 바로 반영되게 한다.
-      queryClient.invalidateQueries({ queryKey: ["watchlist", "list"] })
-    );
-    router.push("/");
+    startRemove(async () => {
+      const removed = await removeWatchlistItemAction(ticker);
+      // 0-row였다면 서버가 아무것도 확정하지 않은 것이다 — 캐시를 건드리지 않는다.
+      if (removed) {
+        applyWatchlistRemoved(queryClient, removed);
+        void queryClient.invalidateQueries({ queryKey: WATCHLIST_LIST_KEY });
+      }
+      router.push("/");
+    });
   }
 
   return (
@@ -300,7 +315,7 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
             판매
           </Button>
         ) : (
-          <RemoveFromWatchlistButton onConfirm={handleRemove} />
+          <RemoveFromWatchlistButton onConfirm={handleRemove} pending={removing} />
         )}
         <Button variant="buy" size="lg" className="flex-1" onClick={handleBuy}>
           구매
@@ -317,13 +332,21 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
  * 시작한다. 버튼이 어디에 놓이든 이 사실은 그대로이고, 지금은 눈에 띄는 `구매` 바로 옆이라
  * 오탭 비용이 오히려 더 크다.
  */
-function RemoveFromWatchlistButton({ onConfirm }: { onConfirm: () => void }) {
+function RemoveFromWatchlistButton({
+  onConfirm,
+  pending,
+}: {
+  onConfirm: () => void;
+  pending: boolean;
+}) {
   return (
     <AlertDialog>
+      {/* 다이얼로그는 확인과 동시에 닫히므로 대기는 이 트리거 자리에서 말한다 — 버튼이
+          아무 반응 없이 그대로 있으면 "안 눌렸나"가 되고, 그 오해가 두 번 누르게 만든다. */}
       <AlertDialogTrigger
-        render={<Button variant="outline" size="lg" className="flex-1" />}
+        render={<Button variant="outline" size="lg" className="flex-1" disabled={pending} />}
       >
-        관심종목에서 제외
+        {pending ? "빼는 중…" : "관심종목에서 제외"}
       </AlertDialogTrigger>
       <AlertDialogContent size="sm">
         <AlertDialogHeader>

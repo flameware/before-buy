@@ -42,13 +42,16 @@ export async function getExistingThesisAction(ticker: string): Promise<Thesis | 
   return getExistingThesis(ticker);
 }
 
-/** S3 "이대로 담기": 이미 생성된 critique/quote를 재사용해 원자적으로 커밋한다. */
+/**
+ * S3 "이대로 담기": 이미 생성된 critique/quote를 재사용해 원자적으로 커밋하고,
+ * **담긴 행을 그대로 돌려준다** — 호출부가 S1 캐시에 옮겨 담는다 (#107, ADR-0010).
+ */
 export async function commitThesisAction(
   ticker: string,
   draft: ThesisDraftInput,
   critique: CritiqueOutput,
   quote: QuoteSnapshot
-): Promise<void> {
+): Promise<SettledWatchlistItem> {
   return commitThesis(ticker, draft, critique, quote);
 }
 
@@ -57,8 +60,10 @@ export async function commitThesisAction(
  *
  * S3를 거치지 않으므로 LLM 호출도 critique도 없다. 담은 날 가격을 위한 KIS 왕복
  * 한 번이 전부이고, 그마저 실패해도 담기는 성공한다.
+ *
+ * 담긴 행을 그대로 돌려준다 — 호출부가 S1 캐시에 옮겨 담는다 (#107, ADR-0010).
  */
-export async function addWithoutThesisAction(ticker: string): Promise<void> {
+export async function addWithoutThesisAction(ticker: string): Promise<SettledWatchlistItem> {
   return addWatchlistItemWithoutThesis(ticker);
 }
 
@@ -90,8 +95,11 @@ export async function getWatchlistItemDetailAction(
   return getWatchlistItemDetail(ticker, scenario);
 }
 
-/** S5 "관심종목에서 제외": watchlist_items.status를 'removed'로 실제 update한다. */
-export async function removeWatchlistItemAction(ticker: string): Promise<void> {
+/**
+ * S5 "관심종목에서 제외": watchlist_items.status를 'removed'로 실제 update하고 뺀 티커를
+ * 돌려준다. 0-row였다면 `null` — 호출부는 그때 캐시를 건드리지 않는다 (#107, ADR-0010).
+ */
+export async function removeWatchlistItemAction(ticker: string): Promise<string | null> {
   return removeWatchlistItem(ticker);
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { ScreenHeader } from "@/components/layout/screen-header";
 import { addWithoutThesisAction } from "@/app/actions";
+import { applyWatchlistAdded, WATCHLIST_LIST_KEY } from "@/lib/watchlist/cache";
 import { canLeaveFollowups, toFollowupAnswers } from "@/lib/thesis/followup-answers";
 import {
   CATEGORIES,
@@ -110,6 +112,7 @@ export function ThesisFlow({
   alreadyWatched: boolean;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [skipping, startSkip] = useTransition();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [category, setCategory] = useState<ThesisCategory | null>(null);
@@ -149,7 +152,10 @@ export function ThesisFlow({
    */
   function handleSkip() {
     startSkip(async () => {
-      await addWithoutThesisAction(ticker);
+      const added = await addWithoutThesisAction(ticker);
+      // ADR-0010: 응답으로 온 행을 S1 캐시에 옮겨 담고, 무효화는 배경 재검증으로 남긴다 (#107).
+      applyWatchlistAdded(queryClient, added);
+      void queryClient.invalidateQueries({ queryKey: WATCHLIST_LIST_KEY });
       router.push(`/?highlight=${ticker}`);
     });
   }

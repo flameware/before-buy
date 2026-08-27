@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScreenHeader } from "@/components/layout/screen-header";
 import { commitThesisAction, generateThesisResultAction, getExistingThesisAction } from "@/app/actions";
+import { applyWatchlistAdded, WATCHLIST_LIST_KEY } from "@/lib/watchlist/cache";
 import { getThesisDraft } from "@/lib/mock";
 import { isAutoCheck } from "@/lib/premises/engine";
 import type { QuoteSnapshot, Thesis } from "@/lib/mock/types";
@@ -196,14 +197,18 @@ export function ThesisResultView({ ticker, stockName }: { ticker: string; stockN
       return;
     }
     setCommitting(true);
-    await commitThesisAction(
+    const added = await commitThesisAction(
       ticker,
       { category: thesis.category, followup: thesis.followup, freeText: thesis.freeText },
       state.critique,
       state.quote
     );
-    // ADR-0002: 새 종목이 담겼으니 S1 목록 캐시를 무효화해 복귀 시 바로 반영되게 한다.
-    await queryClient.invalidateQueries({ queryKey: ["watchlist", "list"] });
+    // ADR-0010: 서버가 돌려준 행을 S1 캐시에 옮겨 담는다 — 무효화만 하면 S1이 언마운트
+    // 상태라 refetch가 시작되지 않아, 홈에 도착한 뒤에야 두 번의 왕복이 시작됐다 (#107).
+    applyWatchlistAdded(queryClient, added);
+    // 무효화는 남기되 배경 재검증으로 강등한다. 옮겨 담은 값이 조회 결과와 어긋나더라도
+    // (드리프트) 다음 마운트에서 조용히 교정된다.
+    void queryClient.invalidateQueries({ queryKey: WATCHLIST_LIST_KEY });
     router.push(`/?highlight=${ticker}`);
   }
 
