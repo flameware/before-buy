@@ -11,6 +11,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/u
 import { ScreenHeader } from "@/components/layout/screen-header";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
 import { useFrozen } from "@/hooks/use-frozen";
+import { useUnsupportedTradeToast } from "@/hooks/use-unsupported-trade-toast";
 import { snapshotOf, type QuoteState } from "@/lib/quote/quote-state";
 import { useWatchlistItemView } from "@/hooks/use-watchlist-view";
 import { composeView } from "@/lib/watchlist/compose-view";
@@ -50,6 +51,7 @@ export function OrderConfirmContent({
 }) {
   const router = useRouter();
   const { scenario, hydrated } = useDemoScenario();
+  const notifyUnsupportedTrade = useUnsupportedTradeToast();
   const [qty, setQty] = useState(INITIAL_QTY);
   const recordedRef = useRef(false);
 
@@ -86,8 +88,13 @@ export function OrderConfirmContent({
   }
 
   function handleBuy() {
+    // 주문 실행은 프로토타입 범위 밖이지만 **기록은 반드시 남긴다**(#105). `proceed`/`adjust`는
+    // 이 제품의 핵심 지표 — "근거를 본 뒤 수량을 조정했는가"(가설 2, 화면명세 S4)이고,
+    // 여기를 토스트로 갈아치우면 order_events에는 cancel과 update_thesis만 쌓인다.
     record(qty === INITIAL_QTY ? "proceed" : "adjust");
-    router.push(`/?highlight=${ticker}`);
+    // 홈으로 보내지 않는다 — 아무 일도 일어나지 않았는데 "담긴 종목이 강조된 홈"으로
+    // 돌아가면 화면이 주문이 체결된 척을 한다. 시트는 열린 채로 두고 사실만 말한다.
+    notifyUnsupportedTrade("buy");
   }
 
   function handleUpdateThesis() {
@@ -251,12 +258,12 @@ export function OrderConfirmContent({
         </div>
       </div>
 
-      <div className="flex shrink-0 gap-2 border-t border-border px-4 py-3">
-        <Button variant="outline" className="flex-1" onClick={handleExit}>
+      <div data-slot="action-bar" className="flex shrink-0 gap-2 border-t border-border px-4 py-3">
+        <Button variant="outline" size="lg" className="flex-1" onClick={handleExit}>
           취소
         </Button>
         {/* 근거가 뜨기 전에 살 수 있으면 이 화면의 존재 이유가 무너진다. 나가기는 언제나 열어둔다. */}
-        <Button className="flex-1" onClick={handleBuy} disabled={loading}>
+        <Button variant="buy" size="lg" className="flex-1" onClick={handleBuy} disabled={loading}>
           구매
         </Button>
       </div>

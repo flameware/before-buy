@@ -270,11 +270,11 @@ export function ThesisResultView({ ticker, stockName }: { ticker: string; stockN
         </section>
       </div>
 
-      <div className="flex shrink-0 gap-2 border-t border-border px-4 py-3">
-        <Button variant="outline" className="flex-1" onClick={handleRewrite} disabled={committing}>
+      <div data-slot="action-bar" className="flex shrink-0 gap-2 border-t border-border px-4 py-3">
+        <Button variant="outline" size="lg" className="flex-1" onClick={handleRewrite} disabled={committing}>
           다시 쓰기
         </Button>
-        <Button className="flex-1" onClick={handleCommit} disabled={committing}>
+        <Button size="lg" className="flex-1" onClick={handleCommit} disabled={committing}>
           이대로 담기
         </Button>
       </div>

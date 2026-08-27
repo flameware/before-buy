@@ -34,12 +34,17 @@ export function PhoneFrame({
           // `[contain:layout]`은 폰 프레임을 하위 `position:fixed` 요소(Drawer 오버레이/뷰포트 등)의
           // containing block으로 만든다 — 없으면 bottom sheet가 데스크톱 너비에서 프레임을
           // 벗어나 브라우저 전체를 덮는다. Drawer 쪽에서 이 엘리먼트로 직접 portal해야 실제로 적용된다.
-          "relative flex h-dvh w-full flex-col overflow-hidden bg-background [contain:layout]",
+          "group relative flex h-dvh w-full flex-col overflow-hidden bg-background [contain:layout]",
           "sm:h-[874px] sm:w-[402px] sm:rounded-[2.5rem] sm:border sm:border-border sm:shadow-xl",
         )}
       >
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
-        <PhoneFrameContext.Provider value={frameRef}>{modal}</PhoneFrameContext.Provider>
+        {/* Provider가 `children`까지 감싸는 이유: 화면 안에서 여는 오버레이(S5의 관심종목
+            해제 확인 AlertDialog 등)도 같은 이유로 프레임 안에 포탈해야 한다. modal 슬롯만
+            감싸두면 그런 다이얼로그가 데스크톱에서 402px 액자를 벗어나 화면 전체를 덮는다. */}
+        <PhoneFrameContext.Provider value={frameRef}>
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
+          {modal}
+        </PhoneFrameContext.Provider>
         {/* 프레임의 DOM 후손이라 데스크톱에서도 402px 액자 안 하단에 머문다. */}
         <ToastViewport />
       </div>

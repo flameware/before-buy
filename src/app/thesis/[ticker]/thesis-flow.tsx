@@ -220,7 +220,7 @@ export function ThesisFlow({
         ) : null}
       </div>
 
-      <div className="shrink-0 border-t border-border px-4 py-3">
+      <div data-slot="action-bar" className="shrink-0 border-t border-border px-4 py-3">
         {step === 1 ? (
           <div className="flex flex-col items-center gap-3">
             {/* 이미 담긴 종목이면 렌더하지 않는다 — 근거 없이 한 번 더 담을 일이 없다. */}
@@ -235,6 +235,7 @@ export function ThesisFlow({
               </button>
             ) : null}
             <Button
+              size="lg"
               className="w-full"
               disabled={!category || skipping}
               onClick={() => setStep(2)}
@@ -244,12 +245,12 @@ export function ThesisFlow({
           </div>
         ) : null}
         {step === 2 ? (
-          <Button className="w-full" disabled={!step2Complete} onClick={() => setStep(3)}>
+          <Button size="lg" className="w-full" disabled={!step2Complete} onClick={() => setStep(3)}>
             다음
           </Button>
         ) : null}
         {step === 3 ? (
-          <Button className="w-full" onClick={handleSubmit}>
+          <Button size="lg" className="w-full" onClick={handleSubmit}>
             이대로 담기
           </Button>
         ) : null}
