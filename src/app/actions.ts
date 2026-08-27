@@ -24,13 +24,14 @@ export async function loadWatchlistList(): Promise<WatchlistListItem[]> {
 /**
  * S1 시세 쿼리(React Query)가 목록 로드 후 호출하는 Server Action.
  *
- * **던지지 않는다** (#82). 액션이 throw하면 클라이언트 promise가 리젝션으로 오지 않고
- * 쿼리가 영원히 `pending`에 머문다(원인은 #83). 잡을 수 있는 실패는 여기서 잡아
- * 종목별 `null`로 접는다 — 그 자리는 이미 "조회 실패"를 뜻하므로 반환 타입도, 화면도
- * 그대로다.
+ * **던지지 않는다** (#82). 액션이 throw하면 클라이언트 promise는 정상적으로 reject되지만
+ * (#83에서 확인 — Flight 계층은 멀쩡하다), 그 리젝션은 React Query의 재시도 대상이 되고
+ * 재시도는 배경 탭에서 무한정 멈춘다(ADR-0011). 잡을 수 있는 실패는 여기서 잡아 종목별
+ * `null`로 접는다 — 그 자리는 이미 "조회 실패"를 뜻하므로 반환 타입도, 화면도 그대로고,
+ * 애초에 리젝션을 만들지 않으니 재시도에 걸릴 일도 없다.
  *
  * 이것만으로는 부족하다. 직렬화 실패(`return` 이후)와 인프라 크래시는 이 `try` 밖이라
- * 여전히 미결 promise를 남길 수 있고, 그쪽은 호출부의 타임아웃이 맡는다
+ * 응답이 아예 오지 않을 수 있고, 그쪽은 호출부의 타임아웃이 맡는다
  * (`use-watchlist-view.ts`의 `QUOTES_TIMEOUT_MS`). 두 겹이 함께 걸려야 원인과
  * 무관하게 쿼리가 정착한다.
  */
@@ -124,9 +125,10 @@ export async function removeWatchlistItemAction(ticker: string): Promise<string 
  * S1.5 종목 검색 — 상장 종목 전체를 대상으로 한다 (#92, ADR-0008).
  *
  * 마스터를 읽지 못하면 `getListedStocks`가 빈 배열을 돌려주므로 결과도 비어 있다.
- * 던지지 않는 게 중요하다 — Server Action이 throw하면 클라이언트 promise가 reject되지
- * 않고 쿼리가 영원히 pending에 머문다(원인은 #83, 미해결). 시세 쿼리는 호출부에
- * 타임아웃을 둬 그 경우에도 정착시켰지만(#82), 이 검색 쿼리에는 그 그물이 없다.
+ * 던지지 않는 게 중요하다 — 액션이 throw하면 클라이언트 promise가 reject되고, 그
+ * 리젝션은 React Query의 재시도 대상이 되어 배경 탭에서 무한정 멈춘다(ADR-0011, #83).
+ * 시세 쿼리는 `retry: false`와 타임아웃으로 그 자리를 막았지만(#82), 이 검색 쿼리에는
+ * 그 그물이 없다.
  */
 export async function searchStocksAction(query: string): Promise<Stock[]> {
   const stocks = await getListedStocks();
