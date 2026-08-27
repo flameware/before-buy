@@ -2,13 +2,6 @@
 docs/prd
 .claude/
 
-# root-level spec/doc files — keep only these
-/*.md
-!/AGENTS.md
-!/CLAUDE.md
-!/README.md
-!/CONTEXT.md
-
 # next.js
 /.next/
 /out/
