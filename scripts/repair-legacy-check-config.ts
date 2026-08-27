@@ -25,9 +25,8 @@
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../src/lib/db";
 import { premises, theses, watchlistItems } from "../src/lib/db/schema";
-import { SEED_PREMISE_CHECK_CONFIG } from "../src/lib/db/seed";
 import { parseCheckConfig } from "../src/lib/premises/engine";
-import { SEED_ITEMS } from "../src/lib/mock/seed-data";
+import { SEED_ITEMS, SEED_PREMISE_CHECK_CONFIG } from "../src/lib/mock/seed-data";
 import type { PremiseCheckConfig } from "../src/lib/mock/types";
 
 const APPLY = process.argv.includes("--apply");
