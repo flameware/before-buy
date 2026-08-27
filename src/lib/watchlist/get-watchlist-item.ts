@@ -88,13 +88,19 @@ function withResolvedPremises(
 /**
  * "관심종목에서 제외": 인메모리 삭제 대신 `status = 'removed'`로 실제 update.
  * 세션 소유가 아닌 항목은 조용히 무시(0-row update)한다.
+ *
+ * **실제로 뺀 티커를 돌려준다** (#107, ADR-0010) — 호출부는 이 응답을 받아야 S1 목록
+ * 캐시에서 그 종목을 뺄 수 있다. 0-row였다면 `null`이고, 그때 캐시를 건드리면 서버가
+ * 확정하지 않은 사실을 화면이 주장하게 된다.
  */
-export async function removeWatchlistItem(ticker: string): Promise<void> {
+export async function removeWatchlistItem(ticker: string): Promise<string | null> {
   return withSession(async (sessionId) => {
-    await db
+    const removed = await db
       .update(watchlistItems)
       .set({ status: "removed" })
-      .where(and(eq(watchlistItems.sessionId, sessionId), eq(watchlistItems.ticker, ticker)));
+      .where(and(eq(watchlistItems.sessionId, sessionId), eq(watchlistItems.ticker, ticker)))
+      .returning({ ticker: watchlistItems.ticker });
+    return removed[0]?.ticker ?? null;
   });
 }
 

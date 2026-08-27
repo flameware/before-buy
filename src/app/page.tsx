@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -247,8 +248,11 @@ export default function Home() {
             </p>
           )}
           <Link href="/search">
+            {/* `+`는 문자가 아니라 아이콘이다. 규격을 S4 수량 조절 버튼과 맞춰
+                (`order-confirm-content.tsx`) 앱 안에서 `+`가 한 가지 모양이 되게 한다. */}
             <Button variant="outline" size="lg" className="w-full">
-              + 종목 추가
+              <Plus className="size-4" />
+              종목 추가
             </Button>
           </Link>
         </section>
