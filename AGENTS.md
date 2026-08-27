@@ -12,6 +12,11 @@ Five canonical roles, label strings equal to their names. See `docs/agents/triag
 
 Single-context layout — `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### Tests
+
+`bun run test` (vitest, node 환경 — 지켜보며 돌리려면 `bun run test:watch`). 순수 함수만 대상이며 테스트는 대상 파일 옆에
+`*.test.ts`로 둔다. 범위와 이유는 `docs/adr/0006-vitest-for-pure-function-tests.md`.
+
 ### LLM experiments
 
 Paid API calls that compare conditions — models, prompts, parameters, output modes — bill per call and multiply fast. Read `docs/agents/llm-experiments.md` before running any of them.
