@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
-import { badgeLabel, badgeState, changedCount, splitByStatus, type BadgeState } from "@/lib/mock";
-import { hasAutoPremise } from "@/lib/premises/engine";
+import { splitByStatus, type BadgeState } from "@/lib/mock";
+import { badgeDisplay, badgeLabel, countByJudgment } from "@/lib/premises/badge";
 import { useWatchlistView } from "@/hooks/use-watchlist-view";
 import type { WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
 
@@ -53,14 +53,11 @@ function StockCard({
   highlighted?: boolean;
 }) {
   const router = useRouter();
-  const state = badgeState(item);
   const quote = item.quote;
 
-  // 시세를 기다리는 동안 자동 전제는 전부 "확인 전"이라 배지가 "유지 중"으로 계산된다 —
-  // 곧 "달라짐"이 될 자리에 잘못된 확신을 보여주게 되므로 판정이 시세에 달린 종목만
-  // 배지를 가린다. "근거 없음"이나 직접 확인 전제뿐인 종목은 이미 확정된 상태다.
-  const badgePending =
-    quote.state === "loading" && !!item.thesis && hasAutoPremise(item.thesis.premises);
+  // 배지를 그릴 수 있는지(조회 중·조회 실패면 판정 불가)는 `badgeDisplay`가 정한다 —
+  // 이 조건을 카드가 인라인으로 들고 있다가 실패 축을 빠뜨린 것이 #81이었다.
+  const badge = badgeDisplay(item, quote);
 
   return (
     <div
@@ -80,10 +77,14 @@ function StockCard({
           <span className="truncate font-medium">{item.name}</span>
           <span className="shrink-0 text-xs text-muted-foreground">{item.ticker}</span>
         </div>
-        {badgePending ? (
+        {badge.kind === "badge" ? (
+          <Badge variant={badgeVariant(badge.state)}>{badgeLabel(badge.state)}</Badge>
+        ) : badge.kind === "pending" ? (
           <Skeleton className="h-5 w-16 rounded-4xl" />
         ) : (
-          <Badge variant={badgeVariant(state)}>{badgeLabel(state)}</Badge>
+          // 판정 불가 — 배지 자리를 비운다. 오른쪽의 "시세 조회 실패"가 그 사정을 말한다.
+          // 자리는 그대로 두어(높이 유지) 카드가 목록 안에서 혼자 짧아지지 않게 한다.
+          <div className="h-5" aria-hidden />
         )}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
@@ -176,7 +177,14 @@ export default function Home() {
   const { items: watchlist, isLoading: loading } = useWatchlistView(scenario, hydrated);
 
   const { watching, bought } = splitByStatus(watchlist);
-  const numChanged = changedCount(watchlist);
+  // 달라짐과 판정 불가를 한 번에 센다 — 빨간 배너는 판정된 것만 세고, 시세를 못 불러와
+  // 판정하지 못한 종목은 그 아래 줄이 따로 말한다. 예전에는 후자가 "유지 중"으로 접혀
+  // 배너 자체가 조용히 사라졌다(#81).
+  const { changed: numChanged, unknown: numUnknown } = countByJudgment(watchlist);
+  const firstChanged = watchlist.find((i) => {
+    const display = badgeDisplay(i, i.quote);
+    return display.kind === "badge" && display.state === "changed";
+  });
 
   useEffect(() => {
     if (!highlightTicker) return;
@@ -207,11 +215,16 @@ export default function Home() {
         ) : null}
         {numChanged > 0 ? (
           <Link
-            href={`/stocks/${watchlist.find((i) => badgeState(i) === "changed")?.ticker ?? ""}`}
+            href={`/stocks/${firstChanged?.ticker ?? ""}`}
             className="rounded-lg bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive"
           >
             {numChanged}개 종목에서 달라진 점이 있어요
           </Link>
+        ) : null}
+        {numUnknown > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {numUnknown}개 종목은 시세를 불러오지 못해 확인할 수 없어요
+          </p>
         ) : null}
       </header>
 

@@ -52,15 +52,6 @@ export function resolvePremises(premises: Premise[], quote: QuoteSnapshot | null
   });
 }
 
-/**
- * 이 근거의 판정이 시세에 달려 있는가. 시세가 아직 오지 않은 동안 배지/전제 상태를
- * 가려야 할지 화면이 판단하는 데 쓴다 — 직접 확인 전제만 있는 종목은 시세와 무관하게
- * 이미 확정된 상태라 가릴 이유가 없다.
- */
-export function hasAutoPremise(premises: Premise[]): boolean {
-  return premises.some((p) => AUTO_CHECK_TYPES.has(p.checkType));
-}
-
 interface CheckResult {
   status: PremiseStatus;
   observedValue?: string;

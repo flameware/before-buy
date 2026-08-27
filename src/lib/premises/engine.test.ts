@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasAutoPremise, parseCheckConfig, resolvePremises } from "./engine";
+import { parseCheckConfig, resolvePremises } from "./engine";
 import type { Premise, QuoteSnapshot } from "@/lib/mock/types";
 
 const QUOTE: QuoteSnapshot = { price: 70_000, changePercent: 1.2, per: 12, pbr: 1.1 };
@@ -192,22 +192,6 @@ describe("resolvePremises — 입력 보존", () => {
       ["b", "manual"],
       ["c", "broken"],
     ]);
-  });
-});
-
-describe("hasAutoPremise", () => {
-  it("price/valuation 전제가 하나라도 있으면 참", () => {
-    expect(hasAutoPremise([premise({ checkType: "qualitative" }), premise({ checkType: "valuation" })])).toBe(true);
-  });
-
-  it("직접 확인 전제만 있으면 거짓 — 시세와 무관하므로 가릴 이유가 없다", () => {
-    expect(
-      hasAutoPremise([premise({ checkType: "fundamental" }), premise({ checkType: "qualitative" })])
-    ).toBe(false);
-  });
-
-  it("전제가 없으면 거짓", () => {
-    expect(hasAutoPremise([])).toBe(false);
   });
 });
 
