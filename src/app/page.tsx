@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ScreenHeaderRow, ScreenHeaderShell } from "@/components/layout/screen-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -199,6 +200,11 @@ export default function Home() {
   } = countByJudgment(watchlist);
   useChangeSummaryToast(numChanged);
 
+  // 헤더 타이틀 행 아래에 붙는 문장들. 하나도 없으면 래퍼째 빠져야 한다 — 빈 래퍼가 남으면
+  // 그 `mt-3`이 헤더를 12px 늘려, 방금 다른 화면과 맞춘 높이가 홈에서만 다시 어긋난다(#129).
+  const showFutureBanner = scenario === "future";
+  const hasHeaderNotes = showFutureBanner || numUnknown > 0 || numUnjudged > 0;
+
   useEffect(() => {
     if (!highlightTicker) return;
     const timer = setTimeout(() => {
@@ -213,8 +219,11 @@ export default function Home() {
       <Suspense fallback={null}>
         <HighlightParam onHighlight={setHighlightTicker} />
       </Suspense>
-      <header className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-3">
-        <div className="flex items-center justify-between">
+      {/* 홈은 뒤로갈 곳이 없어 `ScreenHeader`를 쓰지 못하지만, 타이틀 행은 다른 화면과 같은
+          `ScreenHeaderRow`(32px)를 쓴다 — 여기만 24px로 주저앉아 헤더가 8px 낮았다(#129).
+          가로는 따라가지 않는다: `←`가 영영 안 들어오는 자리를 비워둘 이유가 없다. */}
+      <ScreenHeaderShell>
+        <ScreenHeaderRow className="justify-between">
           <h1 className="text-base font-semibold">관심종목</h1>
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             {/* 이 뱃지가 가리키는 것은 값이 아니라 **토글이라는 장치 자체**라 On/Off와 무관하게
@@ -223,28 +232,35 @@ export default function Home() {
             3개월 후 보기
             <Switch checked={hydrated && scenario === "future"} onCheckedChange={toggle} />
           </label>
-        </div>
-        {scenario === "future" ? (
-          <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-            서비스 컨셉 데모를 위해 3개월 후 상황을 가정한 값을 보여드립니다
-          </p>
+        </ScreenHeaderRow>
+        {/* 이 문장들은 서로 독립된 상태 표시라 캡션처럼 타이틀에 달라붙지 않고 각자 선다.
+            그래서 간격(`gap-3`)을 셸이 아니라 이 래퍼가 갖는다 — 셸이 gap을 소유하면
+            subtitle이 달라붙어야 하는 다른 화면들과 값이 충돌한다(#129). */}
+        {hasHeaderNotes ? (
+          <div className="mt-3 flex flex-col gap-3">
+            {showFutureBanner ? (
+              <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+                서비스 컨셉 데모를 위해 3개월 후 상황을 가정한 값을 보여드립니다
+              </p>
+            ) : null}
+            {/* 달라짐 요약은 헤더에 상주하지 않고 토스트로 지나간다(#103, useChangeSummaryToast).
+                반면 아래 "시세를 불러오지 못해"는 사건이 아니라 풀리기 전까지 계속 참인 상태라
+                정적 텍스트로 남는다 — 사라지면 "왜 이 카드엔 배지가 없지"에 답할 문장이 없어진다. */}
+            {numUnknown > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {numUnknown}개 종목은 시세를 불러오지 못해 확인할 수 없어요
+              </p>
+            ) : null}
+            {/* 시세 문장과 **나란히 서는 별도 문장**이다 — 합산하면 한 문장이 두 원인을 뭉뚱그려
+                둘 중 한쪽 종목에는 반드시 거짓이 된다(#102). 두 축이 동시에 있으면 둘 다 뜬다. */}
+            {numUnjudged > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {numUnjudged}개 종목은 시스템이 확인할 수 없는 근거가 있어요
+              </p>
+            ) : null}
+          </div>
         ) : null}
-        {/* 달라짐 요약은 헤더에 상주하지 않고 토스트로 지나간다(#103, useChangeSummaryToast).
-            반면 아래 "시세를 불러오지 못해"는 사건이 아니라 풀리기 전까지 계속 참인 상태라
-            정적 텍스트로 남는다 — 사라지면 "왜 이 카드엔 배지가 없지"에 답할 문장이 없어진다. */}
-        {numUnknown > 0 ? (
-          <p className="text-xs text-muted-foreground">
-            {numUnknown}개 종목은 시세를 불러오지 못해 확인할 수 없어요
-          </p>
-        ) : null}
-        {/* 시세 문장과 **나란히 서는 별도 문장**이다 — 합산하면 한 문장이 두 원인을 뭉뚱그려
-            둘 중 한쪽 종목에는 반드시 거짓이 된다(#102). 두 축이 동시에 있으면 둘 다 뜬다. */}
-        {numUnjudged > 0 ? (
-          <p className="text-xs text-muted-foreground">
-            {numUnjudged}개 종목은 시스템이 확인할 수 없는 근거가 있어요
-          </p>
-        ) : null}
-      </header>
+      </ScreenHeaderShell>
 
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
         <section className="flex flex-col gap-2">
