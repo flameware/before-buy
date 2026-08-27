@@ -7,7 +7,7 @@
 // "생각이 바뀌셨나요?" 링크가 뜨지 않았다.
 
 import "server-only";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { watchlistItems } from "@/lib/db/schema";
 import { withSession } from "@/lib/db/session";
@@ -41,6 +41,10 @@ async function loadItem(
   scenario: DemoScenario
 ): Promise<SettledWatchlistItem | null> {
   return withSession(async (sessionId) => {
+    // 티커 하나에 항목 하나가 모델이지만(#98), "1건"을 정렬 없이 뽑는 쿼리는 그 모델이
+    // 지켜지는지에 목숨을 건다. 옛 중복이 남아 있으면 DB가 돌려주는 순서에 따라 같은 화면이
+    // 두 번 열릴 때 다른 근거를 보여준다. `commitThesis`의 재사용 선택과 같은 기준(먼저 담은
+    // 행)으로 끊는다.
     const [item] = await db
       .select()
       .from(watchlistItems)
@@ -50,7 +54,9 @@ async function loadItem(
           eq(watchlistItems.ticker, ticker),
           inArray(watchlistItems.status, ["watching", "bought"])
         )
-      );
+      )
+      .orderBy(asc(watchlistItems.createdAt), asc(watchlistItems.id))
+      .limit(1);
     if (!item) return null;
 
     const [theseByItem, quotes] = await Promise.all([
@@ -88,6 +94,10 @@ function withResolvedPremises(
 /**
  * "관심종목에서 제외": 인메모리 삭제 대신 `status = 'removed'`로 실제 update.
  * 세션 소유가 아닌 항목은 조용히 무시(0-row update)한다.
+ *
+ * **계약은 "1건 제외"가 아니라 "이 티커 전부 제외"다** — 티커로 매칭되는 세션 소유 행
+ * 전부의 status를 바꾼다. 근거 갱신이 항목을 복제하지 않게 된 뒤로(#98) 실질 차이는
+ * 없지만, 그 이전에 쌓인 중복까지 한 번에 정리하는 것이 이 함수의 동작이다.
  *
  * **실제로 뺀 티커를 돌려준다** (#107, ADR-0010) — 호출부는 이 응답을 받아야 S1 목록
  * 캐시에서 그 종목을 뺄 수 있다. 0-row였다면 `null`이고, 그때 캐시를 건드리면 서버가
