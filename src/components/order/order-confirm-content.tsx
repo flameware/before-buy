@@ -175,7 +175,9 @@ export function OrderConfirmContent({
               <span className="text-muted-foreground">전제 상태</span>
               {badge?.kind === "pending" ? (
                 <Skeleton className="h-5 w-12 rounded-full" />
-              ) : badge?.kind === "unknown" ? (
+              ) : badge?.kind === "unknown" || badge?.kind === "unjudged" ? (
+                // 배지는 같은 "확인 불가"를 쓴다 — 사용자에게 결론은 같기 때문이다.
+                // 갈리는 것은 아래 딸린 설명이며, 원인이 다르므로 문구도 갈려야 한다(#102).
                 <Badge variant="outline">확인 불가</Badge>
               ) : (
                 <Badge variant={changed ? "destructive" : "secondary"}>
@@ -186,6 +188,12 @@ export function OrderConfirmContent({
             {badge?.kind === "unknown" ? (
               <p className="text-xs text-muted-foreground">
                 시세를 불러오지 못해 지금은 근거가 유효한지 확인할 수 없어요.
+              </p>
+            ) : badge?.kind === "unjudged" ? (
+              // 이 종목은 시세가 정상으로 도착해 있다 — 시세를 원인으로 지목하면 두 번째
+              // 거짓말이 된다. 무엇을 해야 하는지는 S5의 전제 한 줄이 말한다(#92).
+              <p className="text-xs text-muted-foreground">
+                이 근거에는 시스템이 판정할 수 없는 조건이 있어 지금은 확인할 수 없어요.
               </p>
             ) : null}
             {changed ? (
