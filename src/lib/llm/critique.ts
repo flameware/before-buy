@@ -24,6 +24,7 @@ import {
   CritiqueOutputSchema,
   CritiqueRawOutput,
   findSemanticProblems,
+  logChallengeableDistribution,
   logForbiddenWords,
   logUnavailableMetricPremises,
   toPremises,
@@ -94,6 +95,8 @@ export async function generateCritiqueAndPremises(input: CritiqueInput): Promise
   logForbiddenWords(parsed);
   // 경고만 남기고 흐름은 그대로 둔다 — 이 전제는 검증에 걸리지 않고 그대로 저장된다 (#111).
   logUnavailableMetricPremises(parsed, { per: input.per, pbr: input.pbr });
+  // 카테고리마다 예시가 한 벌뿐이라 생기는 `true` 편향을 재는 유일한 층 (#114).
+  logChallengeableDistribution(parsed, input.category);
 
   return {
     isChallengeable: parsed.is_challengeable,

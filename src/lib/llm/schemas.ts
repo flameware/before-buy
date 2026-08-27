@@ -10,6 +10,7 @@
 // 둘 다 critique.ts 입장에서는 "검증 실패 → 1회 재시도" 대상으로 동일하게 취급된다.
 
 import { z } from "zod";
+import type { ThesisCategory } from "@/lib/mock/types";
 import type { LLMCheckConfig, LLMPremise } from "./types";
 
 const FORBIDDEN_WORDS = ["논지", "가설", "전제", "테제", "정합성", "밸류에이션"];
@@ -188,6 +189,27 @@ export function logUnavailableMetricPremises(v: CritiqueRawOutput, metrics: Avai
         `premises[${index}]: "${statement}" (판정되지 않고 읽을 수 없음으로 남는다)`
     );
   }
+}
+
+/**
+ * 카테고리와 `is_challengeable`을 한 줄로 남긴다. 집계는 운영 로그에서 한다.
+ *
+ * 이 줄이 #114 설계의 **계기판**이다. 카테고리마다 few-shot 예시가 한 벌뿐이라, 그 예시가
+ * `true`인 카테고리에서는 모델이 `false`를 내는 법을 배울 기회가 없다 — 원칙 3(억지 반박
+ * 금지)이 가장 무너지기 쉬운 자리다. 예시 7벌 중 2벌을 `false`로 두고 각 지침에 "반박할
+ * 지점이 약한 경우" 한 줄을 넣어 막았지만, 실제로 막혔는지는 분포로만 알 수 있다.
+ * **전 카테고리 90% 이상 `true`면 원칙 3이 죽은 것이다**(명세 5장).
+ *
+ * `logForbiddenWords`·`logUnavailableMetricPremises`와 같은 계열 — 반환값 없이 콘솔에만
+ * 남기고 흐름을 바꾸지 않는다. **`findSemanticProblems`에 넣지 않는다.** 그쪽 반환값은 곧
+ * 재시도이고 재시도 실패는 `LLMError`인데, 편향은 응답 하나만 보고는 판정할 수 없는 것이라
+ * 개별 응답을 실패시킬 근거가 되지 못한다.
+ */
+export function logChallengeableDistribution(v: CritiqueRawOutput, category: ThesisCategory): void {
+  console.info(
+    `[llm/critique] category=${category} is_challengeable=${v.is_challengeable} ` +
+      `counterpoints=${v.counterpoints.length}`
+  );
 }
 
 /** 형식 스키마의 null을 도메인 타입의 undefined로 되돌린다. */
