@@ -4,7 +4,7 @@ import { commitThesis } from "@/lib/thesis/commit-thesis";
 import { generateThesisResult, type GenerateThesisResultOutcome, type ThesisDraftInput } from "@/lib/thesis/generate-result";
 import { getExistingThesis } from "@/lib/thesis/get-existing-thesis";
 import type { CritiqueOutput } from "@/lib/llm/types";
-import { getWatchlistListView, getWatchlistQuoteMap, type WatchlistListItem, type WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
+import { getWatchlistListView, getWatchlistQuoteMap, type SettledWatchlistItem, type WatchlistListItem } from "@/lib/watchlist/get-watchlist";
 import { getWatchlistItemDetail, getWatchlistItemForOrder, removeWatchlistItem } from "@/lib/watchlist/get-watchlist-item";
 import { recordOrderEvent, recordOrderEventByTicker, type OrderEventInput } from "@/lib/order/record-order-event";
 import type { DemoScenario, QuoteSnapshot, Thesis } from "@/lib/mock/types";
@@ -52,7 +52,7 @@ export async function commitThesisAction(
 export async function getOrderConfirmItemAction(
   ticker: string,
   scenario: DemoScenario
-): Promise<WatchlistViewItem | null> {
+): Promise<SettledWatchlistItem | null> {
   return getWatchlistItemForOrder(ticker, scenario);
 }
 
@@ -72,7 +72,7 @@ export async function recordOrderEventByTickerAction(
 export async function getWatchlistItemDetailAction(
   ticker: string,
   scenario: DemoScenario
-): Promise<WatchlistViewItem | null> {
+): Promise<SettledWatchlistItem | null> {
   return getWatchlistItemDetail(ticker, scenario);
 }
 

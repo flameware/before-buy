@@ -5,9 +5,11 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
 import { badgeLabel, badgeState, changedCount, splitByStatus, type BadgeState } from "@/lib/mock";
+import { hasAutoPremise } from "@/lib/premises/engine";
 import { useWatchlistView } from "@/hooks/use-watchlist-view";
 import type { WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
 
@@ -54,6 +56,12 @@ function StockCard({
   const state = badgeState(item);
   const quote = item.quote;
 
+  // 시세를 기다리는 동안 자동 전제는 전부 "확인 전"이라 배지가 "유지 중"으로 계산된다 —
+  // 곧 "달라짐"이 될 자리에 잘못된 확신을 보여주게 되므로 판정이 시세에 달린 종목만
+  // 배지를 가린다. "근거 없음"이나 직접 확인 전제뿐인 종목은 이미 확정된 상태다.
+  const badgePending =
+    quote.state === "loading" && !!item.thesis && hasAutoPremise(item.thesis.premises);
+
   return (
     <div
       role="button"
@@ -72,24 +80,36 @@ function StockCard({
           <span className="truncate font-medium">{item.name}</span>
           <span className="shrink-0 text-xs text-muted-foreground">{item.ticker}</span>
         </div>
-        <Badge variant={badgeVariant(state)}>{badgeLabel(state)}</Badge>
+        {badgePending ? (
+          <Skeleton className="h-5 w-16 rounded-4xl" />
+        ) : (
+          <Badge variant={badgeVariant(state)}>{badgeLabel(state)}</Badge>
+        )}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
-        {quote ? (
+        {quote.state === "ok" ? (
           <>
-            <span className="text-sm font-medium tabular-nums">{formatPrice(quote.price)}</span>
+            <span className="text-sm font-medium tabular-nums">
+              {formatPrice(quote.snapshot.price)}
+            </span>
             <span
               className={
                 "text-xs tabular-nums " +
-                (quote.changePercent > 0
+                (quote.snapshot.changePercent > 0
                   ? "text-red-500"
-                  : quote.changePercent < 0
+                  : quote.snapshot.changePercent < 0
                     ? "text-blue-500"
                     : "text-muted-foreground")
               }
             >
-              {formatChange(quote.changePercent)}
+              {formatChange(quote.snapshot.changePercent)}
             </span>
+          </>
+        ) : quote.state === "loading" ? (
+          // 조회 중과 조회 실패는 다르다 — 아직 시도가 끝나지 않았는데 실패를 알리지 않는다.
+          <>
+            <Skeleton className="h-5 w-20" />
+            <Skeleton className="h-4 w-10" />
           </>
         ) : (
           <span className="text-xs text-muted-foreground">시세 조회 실패</span>

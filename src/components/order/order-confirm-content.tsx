@@ -11,6 +11,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/u
 import { ScreenHeader } from "@/components/layout/screen-header";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
 import { useFrozen } from "@/hooks/use-frozen";
+import { snapshotOf, type QuoteState } from "@/lib/quote/quote-state";
 import { composeView, useWatchlistItemView } from "@/hooks/use-watchlist-view";
 import { badgeState, getCategory } from "@/lib/mock";
 import { recordOrderEventAction, recordOrderEventByTickerAction } from "@/app/actions";
@@ -57,7 +58,10 @@ export function OrderConfirmContent({
   );
 
   // 재검증된 시세에 고정한다. 고정 전에는 캐시 값이 그대로 통과하므로 화면이 비지 않는다.
-  const frozenQuote = useFrozen(quote, quoteSettled);
+  // 고정 대상은 스냅샷뿐이다 — "조회 중"은 애초에 붙잡아 둘 값이 아니라서, 아직 고정된
+  // 스냅샷이 없으면 훅이 알려준 상태(조회 중/실패)를 그대로 흘려보낸다.
+  const frozenSnapshot = useFrozen(snapshotOf(quote), quoteSettled);
+  const frozenQuote: QuoteState = frozenSnapshot ? { state: "ok", snapshot: frozenSnapshot } : quote;
   const item = listItem ? composeView(listItem, frozenQuote) : null;
 
   function record(action: OrderEventAction) {
@@ -177,11 +181,11 @@ export function OrderConfirmContent({
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">{stockName}</span>
-            {loading ? (
+            {loading || item.quote.state === "loading" ? (
               <Skeleton className="h-5 w-24" />
             ) : (
               <span className="text-sm text-muted-foreground">
-                {item.quote ? formatPrice(item.quote.price) : "시세 조회 실패"}
+                {item.quote.state === "ok" ? formatPrice(item.quote.snapshot.price) : "시세 조회 실패"}
               </span>
             )}
           </div>
@@ -217,10 +221,14 @@ export function OrderConfirmContent({
           </div>
           <div className="flex items-center justify-between text-sm text-muted-foreground">
             <span>합계</span>
-            {loading ? (
+            {loading || item.quote.state === "loading" ? (
               <Skeleton className="h-5 w-24" />
             ) : (
-              <span>{item.quote ? formatPrice(item.quote.price * qty) : "시세 조회 실패"}</span>
+              <span>
+                {item.quote.state === "ok"
+                  ? formatPrice(item.quote.snapshot.price * qty)
+                  : "시세 조회 실패"}
+              </span>
             )}
           </div>
         </div>

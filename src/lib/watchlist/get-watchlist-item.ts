@@ -13,9 +13,9 @@ import { watchlistItems } from "@/lib/db/schema";
 import { withSession } from "@/lib/db/session";
 import { resolvePremises } from "@/lib/premises/engine";
 import type { DemoScenario, QuoteSnapshot, Thesis } from "@/lib/mock/types";
-import { fetchLatestTheses, resolveQuotes, type WatchlistViewItem } from "./get-watchlist";
+import { fetchLatestTheses, resolveQuotes, type SettledWatchlistItem } from "./get-watchlist";
 
-export type { WatchlistViewItem };
+export type { SettledWatchlistItem };
 
 /**
  * S4 주문 전 확인: 세션이 소유한(watching/bought) 관심종목 중 ticker와 일치하는 1건.
@@ -24,7 +24,7 @@ export type { WatchlistViewItem };
 export async function getWatchlistItemForOrder(
   ticker: string,
   scenario: DemoScenario
-): Promise<WatchlistViewItem | null> {
+): Promise<SettledWatchlistItem | null> {
   return loadItem(ticker, scenario);
 }
 
@@ -32,14 +32,14 @@ export async function getWatchlistItemForOrder(
 export async function getWatchlistItemDetail(
   ticker: string,
   scenario: DemoScenario
-): Promise<WatchlistViewItem | null> {
+): Promise<SettledWatchlistItem | null> {
   return loadItem(ticker, scenario);
 }
 
 async function loadItem(
   ticker: string,
   scenario: DemoScenario
-): Promise<WatchlistViewItem | null> {
+): Promise<SettledWatchlistItem | null> {
   return withSession(async (sessionId) => {
     const [item] = await db
       .select()
@@ -64,7 +64,7 @@ async function loadItem(
       id: item.id,
       ticker: item.ticker,
       name: item.name,
-      status: item.status as WatchlistViewItem["status"],
+      status: item.status as SettledWatchlistItem["status"],
       isSeed: item.isSeed,
       addedPrice: item.addedPrice != null ? Number(item.addedPrice) : 0,
       addedAt: item.addedAt?.toISOString() ?? item.createdAt.toISOString(),

@@ -19,15 +19,28 @@ import { parseCheckConfig } from "@/lib/premises/engine";
 import { getKoreanStockPrices } from "@/lib/kis/batch-quote";
 import { resolveSeedQuote } from "@/lib/mock/seed-data";
 import type { Critique, DemoScenario, FollowupAnswer, Premise, QuoteSnapshot, Thesis, WatchlistItem } from "@/lib/mock/types";
+import type { QuoteState } from "@/lib/quote/quote-state";
 
-export interface WatchlistViewItem extends WatchlistItem {
+/** 시세를 아직 붙이지 않은 목록 항목 — S1이 목록 쿼리와 시세 쿼리를 분리 캐싱하는 데 쓴다. */
+export interface WatchlistListItem extends WatchlistItem {
   name: string;
-  /** null이면 시세 조회 실패 — 화면은 가격 대신 실패 안내를 보여준다. */
+}
+
+/**
+ * 서버가 돌려주는 1건 — 시세는 이미 결판나 있다. 여기서 `null`은 **조회 실패**만
+ * 뜻한다. 서버에는 "조회 중"이 존재하지 않으므로 3상태 유니온을 쓰지 않는다.
+ */
+export interface SettledWatchlistItem extends WatchlistListItem {
   quote: QuoteSnapshot | null;
 }
 
-/** 시세를 아직 붙이지 않은 목록 항목 — S1이 목록 쿼리와 시세 쿼리를 분리 캐싱하는 데 쓴다. */
-export type WatchlistListItem = Omit<WatchlistViewItem, "quote">;
+/**
+ * 화면이 보는 항목. 시세는 조회 중/실패/완료 3상태다 — 목록과 시세를 따로 캐싱하는
+ * (ADR-0002) 클라이언트에서만 "조회 중"이라는 중간 상태가 생긴다.
+ */
+export interface WatchlistViewItem extends WatchlistListItem {
+  quote: QuoteState;
+}
 
 /**
  * S1 목록(DB 부분만): 화면에 보이는(watching/bought) 종목의 근거/전제를 조회한다.
