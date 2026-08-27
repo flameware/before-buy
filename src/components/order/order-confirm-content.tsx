@@ -258,7 +258,7 @@ export function OrderConfirmContent({
         </div>
       </div>
 
-      <div className="flex shrink-0 gap-2 border-t border-border px-4 py-3">
+      <div data-slot="action-bar" className="flex shrink-0 gap-2 border-t border-border px-4 py-3">
         <Button variant="outline" size="lg" className="flex-1" onClick={handleExit}>
           취소
         </Button>

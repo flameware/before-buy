@@ -291,7 +291,7 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
           보유중의 `판매`/`구매`는 매도를 권하는 것이 아니라, 보유한 종목의 상세에서
           양방향을 동등하게 열어두는 것이다 — 대칭을 깨는 시각 처리(판매만 약하게 그리기
           등)는 제품이 매수 쪽으로 기울었다는 신호가 되므로 하지 않는다 (ADR-0009). */}
-      <div className="flex shrink-0 gap-2 border-t border-border px-4 py-3">
+      <div data-slot="action-bar" className="flex shrink-0 gap-2 border-t border-border px-4 py-3">
         {isBought ? (
           <Button variant="sell" size="lg" className="flex-1" onClick={handleSell}>
             판매
@@ -320,7 +320,7 @@ function RemoveFromWatchlistButton({ onConfirm }: { onConfirm: () => void }) {
     <AlertDialog>
       <AlertDialogTrigger
         aria-label="관심종목에서 빼기"
-        className="-mr-2 flex size-8 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted"
+        className="-mr-2 flex size-8 shrink-0 items-center justify-center rounded-full text-primary hover:bg-muted"
       >
         <Bookmark className="size-5 fill-current" />
       </AlertDialogTrigger>

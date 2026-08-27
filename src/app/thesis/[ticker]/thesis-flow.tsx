@@ -220,7 +220,7 @@ export function ThesisFlow({
         ) : null}
       </div>
 
-      <div className="shrink-0 border-t border-border px-4 py-3">
+      <div data-slot="action-bar" className="shrink-0 border-t border-border px-4 py-3">
         {step === 1 ? (
           <div className="flex flex-col items-center gap-3">
             {/* 이미 담긴 종목이면 렌더하지 않는다 — 근거 없이 한 번 더 담을 일이 없다. */}

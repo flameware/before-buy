@@ -43,12 +43,22 @@ export const useToastManager = Toast.useToastManager;
  *
  * `z-60`인 이유: Drawer도 `z-50`이고 같은 프레임에 **나중에** 포탈되므로, 같은 층에 두면
  * S4 시트가 토스트를 그대로 덮는다 — 시트 안의 `구매`가 띄우는 안내가 보이지 않는다(#105).
+ *
+ * **하단 액션 바나 시트가 있으면 그 위로 올라간다.** 위로 겹치는 것만으로는 부족한데,
+ * 토스트를 띄우는 버튼이 바로 그 바 안에 있기 때문이다 — 방금 누른 버튼을 자기가 띄운
+ * 안내가 가리면 무엇에 대한 응답인지 흐려진다. 올림폭(`pb-24`)은 `size="lg"` 한 줄짜리
+ * 바의 높이(py-3 + h-12 + py-3 = 72px)에 여백을 더한 값이다.
  */
 export function ToastViewport() {
   const { toasts } = useToastManager();
 
   return (
-    <Toast.Viewport className="pointer-events-none absolute inset-x-0 bottom-0 z-60 flex justify-center px-4 pb-6 outline-none">
+    <Toast.Viewport
+      className={cn(
+        "pointer-events-none absolute inset-x-0 bottom-0 z-60 flex justify-center px-4 pb-6 outline-none",
+        "group-has-[[data-slot=action-bar]]:pb-24 group-has-[[data-slot=drawer-popup]]:pb-24"
+      )}
+    >
       {toasts.map((toast) => (
         <Toast.Root
           key={toast.id}

@@ -34,7 +34,7 @@ export function PhoneFrame({
           // `[contain:layout]`은 폰 프레임을 하위 `position:fixed` 요소(Drawer 오버레이/뷰포트 등)의
           // containing block으로 만든다 — 없으면 bottom sheet가 데스크톱 너비에서 프레임을
           // 벗어나 브라우저 전체를 덮는다. Drawer 쪽에서 이 엘리먼트로 직접 portal해야 실제로 적용된다.
-          "relative flex h-dvh w-full flex-col overflow-hidden bg-background [contain:layout]",
+          "group relative flex h-dvh w-full flex-col overflow-hidden bg-background [contain:layout]",
           "sm:h-[874px] sm:w-[402px] sm:rounded-[2.5rem] sm:border sm:border-border sm:shadow-xl",
         )}
       >
