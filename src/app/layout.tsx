@@ -21,7 +21,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "사기 전에",
+  title: "사기 전에 - 왜 담았는지 기억하기",
   description: "투자 아이디어 검증기. 종목을 사기 전에 왜 담았는지 기억하기.",
 };
 
