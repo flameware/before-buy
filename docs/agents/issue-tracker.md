@@ -20,7 +20,10 @@ Any repo change made in the course of resolving a ticket (a `wayfinder:task` doi
 1. `git checkout -b <short-descriptive-name>` off `main`.
 2. Commit only the files relevant to the ticket — leave unrelated pre-existing local changes alone.
 3. `git push -u origin <branch>`, then `gh pr create` with a body linking the ticket it resolves.
-4. Merge (`gh pr merge --squash --delete-branch`) once checks pass; if `git status` shows local `main` has diverged from `origin/main` afterward, reconcile by resetting/pulling — don't force-push over it.
+4. Merge (`gh pr merge --squash`) once checks pass; if `git status` shows local `main` has diverged from `origin/main` afterward, reconcile by resetting/pulling — don't force-push over it.
+
+   **Do not pass `--delete-branch`.** This repo has `delete_branch_on_merge` enabled, so GitHub deletes the head branch server-side on every merge — the flag is redundant, and in a worktree it actively breaks the merge. `--delete-branch` deletes the *local and* remote branch, and to delete the local one `gh` first checks out the base branch; `main` is already claimed by another worktree, so that checkout fails with `fatal: 'main' is already used by worktree at ...`. **`gh` aborts there, after the API merge has already gone through** — so the merge succeeds, the exit code is non-zero, and any cleanup after that point is silently skipped. Read that error as "local cleanup failed", never as "the merge failed": confirm with `gh pr view <n> --json state` before retrying anything.
+
 5. Record the change: the ticket's resolution comment/close (see Wayfinding operations below) links the PR; if the change altered a documented decision or convention, update the relevant doc (`CONTEXT.md`, `docs/adr/`, or this file) too.
 
 ## Pull requests as a triage surface
