@@ -132,16 +132,28 @@ export function ThesisResultView({ ticker, stockName }: { ticker: string; stockN
 
   if (state.status === "loading") {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-        <div
-          className="h-10 w-10 animate-spin rounded-full border-4 border-muted border-t-primary"
-          aria-hidden="true"
-        />
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium">{loadingMessage}</p>
-          <p className="text-xs text-muted-foreground">최대 30초 정도 걸릴 수 있어요</p>
+      <>
+        {/* 유상 LLM 호출이 도는 중이라 뒤로가기를 두지 않는다. `ScreenHeader`는 버튼이 항상
+            렌더되므로 여기서는 쓰지 못하고, S1처럼 로컬 헤더로 간다. `h-8`/`pl-8`은 그 버튼이
+            차지하던 자리 그대로라, 로딩이 끝나 `ScreenHeader`로 바뀔 때 종목명이 뛰지 않는다. */}
+        <header className="flex shrink-0 flex-col gap-1 border-b border-border px-4 py-3">
+          <div className="flex h-8 items-center pl-8">
+            <h1 className="text-base font-semibold">{stockName}</h1>
+          </div>
+        </header>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+          <div
+            className="h-10 w-10 animate-spin rounded-full border-4 border-muted border-t-primary"
+            aria-hidden="true"
+          />
+          <div className="flex flex-col gap-1">
+            {/* 헤더 밖에서 이 화면을 대표하는 문구라 본문(`text-sm`)보다 한 단계 위인
+                `text-base`로 둔다 — 결과 제목(`text-lg`)보다는 한 단계 아래다. */}
+            <p className="text-base font-medium">{loadingMessage}</p>
+            <p className="text-sm text-muted-foreground">최대 30초 정도 걸릴 수 있어요</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
