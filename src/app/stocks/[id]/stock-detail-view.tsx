@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useTransition, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
@@ -25,6 +25,7 @@ import { composeView } from "@/lib/watchlist/compose-view";
 import { returnSinceAdded, returnSinceBuy } from "@/lib/watchlist/returns";
 import { premiseDisplay } from "@/lib/premises/display";
 import { getCategory, type FollowupAnswer, type Premise } from "@/lib/mock";
+import type { DemoScenario } from "@/lib/mock/types";
 import { removeWatchlistItemAction } from "@/app/actions";
 import { applyWatchlistRemoved, WATCHLIST_LIST_KEY } from "@/lib/watchlist/cache";
 
@@ -62,6 +63,134 @@ function followupSummary(category: Parameters<typeof getCategory>[0], followup: 
     const answer = a.freeText ? (option ? `${option.label} · ${a.freeText}` : a.freeText) : (option?.label ?? "-");
     return { prompt, answer };
   });
+}
+
+/**
+ * 가격 흐름 표의 한 행. **행이 곧 시점이다** — 담은 날 / 매수 / 현재.
+ *
+ * 3열(라벨 · 날짜 · 값)로 세우는 이유는 값이 오른쪽 한 축에 꽂히게 하기 위해서다. 예전에는
+ * `담은 날 172,000원 (6/18) → 현재 186,500원 +8.4%` 한 줄이었는데, 라벨·날짜·가격이 뒤섞여
+ * 세로 스캔선이 없었다 — 두 값을 비교하려면 매번 문장을 읽어야 했다(#127). 날짜를 라벨에
+ * 붙이지 않고 제 열에 두는 것도 같은 이유다: 라벨 길이가 달라도(`담은 날` 3자, `매수` 2자)
+ * 날짜가 세로로 맞는다.
+ *
+ * 행은 `<Fragment>`로 셀 셋을 흘려보낸다 — 행마다 `div`로 감싸면 그리드가 열을 못 맞춘다.
+ */
+function PriceFlowRow({
+  label,
+  when,
+  children,
+  emphasis = false,
+}: {
+  label: string;
+  when: string;
+  children: ReactNode;
+  emphasis?: boolean;
+}) {
+  return (
+    <>
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-sm text-muted-foreground">{when}</span>
+      <span className={emphasis ? "text-right text-base font-semibold" : "text-right text-sm text-muted-foreground"}>
+        {children}
+      </span>
+    </>
+  );
+}
+
+/**
+ * 점선 아래 파생 값(`담은 날 대비`·`손익`)의 오른쪽 칸.
+ *
+ * **시세가 없어도 행은 사라지지 않는다.** 예전에는 값이 없으면 줄을 통째로 지웠고, 시세가
+ * 도착하는 순간 카드 높이가 튀었다. 조회 중이면 스켈레톤, 기준이 없으면 `-`로 자리를 지킨다 —
+ * `현재` 행 가격 칸과 같은 규율이고, CONTEXT.md `시세 상태`가 말하는 "결판나기 전에 결판난
+ * 것처럼 말하지 않는다"의 같은 얼굴이다.
+ *
+ * `null`은 **기준 가격이 없다**는 뜻이라 `-`로 말한다 — 0%로 접으면 "안 변했다"가 된다.
+ */
+function DerivedValue({ pending, value }: { pending: boolean; value: number | null }) {
+  if (pending) return <Skeleton className="ml-auto h-4 w-14" />;
+  if (value === null) return <span className="text-right text-sm text-muted-foreground">-</span>;
+  return <span className={`text-right text-sm font-medium ${changeColor(value)}`}>{formatChange(value)}</span>;
+}
+
+/**
+ * S5 상단 **가격 흐름**. 담은 날 → (매수) → 현재라는 시간축을 표로 세우고, 점선 아래에
+ * 그 값들로 계산해낸 것을 둔다.
+ *
+ * 점선인 이유: 근거 카드가 쓰는 실선과 **다른 종류의 경계**다. 칸막이가 아니라 "위는 관측된
+ * 값, 아래는 그걸로 계산해낸 값"이라는 선이라, 같은 선을 쓰면 그냥 또 하나의 문단 구분으로
+ * 읽힌다.
+ *
+ * 보유중의 `담은 날 대비`·`손익`을 한 줄에 나란히 두지 않는 것은 의도된 것이다 — 한 줄에
+ * 넣으면 앞쪽 퍼센트가 오른쪽 정렬선 밖으로 벗어나 이 표의 이점이 깨진다. 두 행으로 세우면
+ * 위에서 아래로 `담은 날 → 매수 → 현재 → 담은 날 대비 → 손익` 순이 되어, 두 파생값이 어느
+ * 행에서 왔는지가 순서만으로 드러난다. 그래서 `손익`은 `매수 대비`로 개명하지 않는다:
+ * `담은 날 대비`는 생각이 아직 맞나를 재는 진단값이고 `손익`은 번 돈과 잃은 돈이라는 사실이라,
+ * 이름을 맞추면 둘이 같은 종류의 퍼센트 두 개로 납작해진다.
+ */
+function PriceFlowSection({
+  item,
+  isBought,
+  snapshot,
+  quotePending,
+  sinceAdded,
+  sinceBuy,
+  scenario,
+}: {
+  item: ReturnType<typeof composeView>;
+  isBought: boolean;
+  snapshot: { price: number } | null;
+  quotePending: boolean;
+  sinceAdded: number | null;
+  sinceBuy: number | null;
+  scenario: DemoScenario;
+}) {
+  // `현재` 행의 날짜 칸에는 날짜를 쓰지 않는다. `담은 날 8/3` 옆에 `현재 8/28`이 서면 둘이
+  // 같은 종류의 값으로 보이는데, 위 두 행은 **박제된 사실**이고 이 행은 **지금 움직이는 값**이다.
+  // 데모 시점이 `3개월 후`면 "현재"가 오늘이 아니므로 그렇게 말한다.
+  const nowLabel = scenario === "future" ? "3개월 후" : "오늘";
+
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-sm font-semibold text-muted-foreground">가격 흐름</h2>
+      <div className="grid grid-cols-[auto_auto_1fr] items-center gap-x-3 gap-y-2 rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
+        <PriceFlowRow label="담은 날" when={formatDate(item.addedAt)}>
+          {formatPrice(item.addedPrice)}
+        </PriceFlowRow>
+
+        {isBought ? (
+          <PriceFlowRow label="매수" when={item.boughtAt ? formatDate(item.boughtAt) : "-"}>
+            {item.avgBuyPrice != null ? formatPrice(item.avgBuyPrice) : "-"}
+          </PriceFlowRow>
+        ) : null}
+
+        <PriceFlowRow label="현재" when={nowLabel} emphasis>
+          {quotePending ? (
+            <Skeleton className="ml-auto h-5 w-24" />
+          ) : snapshot ? (
+            formatPrice(snapshot.price)
+          ) : (
+            "시세 조회 실패"
+          )}
+        </PriceFlowRow>
+
+        <div className="col-span-3 border-t border-dashed border-border" />
+
+        <span className="text-sm text-muted-foreground">담은 날 대비</span>
+        <span />
+        <DerivedValue pending={quotePending} value={sinceAdded} />
+
+        {isBought ? (
+          <>
+            <span className="text-sm text-muted-foreground">손익</span>
+            <span />
+            <DerivedValue pending={quotePending} value={sinceBuy} />
+          </>
+        ) : null}
+      </div>
+    </section>
+  );
 }
 
 /**
@@ -182,62 +311,15 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
     <>
       <ScreenHeader title={stockName} />
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
-        <section className="flex flex-col gap-2 rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
-          {isBought ? (
-            <>
-              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
-                <span className="text-muted-foreground">
-                  담은 날 {formatPrice(item.addedPrice)} ({formatDate(item.addedAt)})
-                </span>
-                <span className="text-muted-foreground">→</span>
-                <span className="text-muted-foreground">
-                  매수 {formatPrice(item.avgBuyPrice ?? 0)} ({item.boughtAt ? formatDate(item.boughtAt) : "-"})
-                </span>
-                <span className="text-muted-foreground">→</span>
-                <span className="font-medium">
-                  현재{" "}
-                  {quotePending ? (
-                    <Skeleton className="inline-block h-4 w-20 align-middle" />
-                  ) : snapshot ? (
-                    formatPrice(snapshot.price)
-                  ) : (
-                    "시세 조회 실패"
-                  )}
-                </span>
-              </div>
-              {sinceAdded !== null || sinceBuy !== null ? (
-                <div className="flex items-center gap-3 text-xs">
-                  {sinceAdded !== null ? (
-                    <span className={changeColor(sinceAdded)}>근거 대비 {formatChange(sinceAdded)}</span>
-                  ) : null}
-                  {sinceBuy !== null ? (
-                    <span className={changeColor(sinceBuy)}>손익 {formatChange(sinceBuy)}</span>
-                  ) : null}
-                </div>
-              ) : null}
-            </>
-          ) : (
-            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
-              <span className="text-muted-foreground">
-                담은 날 {formatPrice(item.addedPrice)} ({formatDate(item.addedAt)})
-              </span>
-              <span className="text-muted-foreground">→</span>
-              <span className="font-medium">
-                현재{" "}
-                {quotePending ? (
-                  <Skeleton className="inline-block h-4 w-20 align-middle" />
-                ) : snapshot ? (
-                  formatPrice(snapshot.price)
-                ) : (
-                  "시세 조회 실패"
-                )}
-              </span>
-              {sinceAdded !== null ? (
-                <span className={`text-xs ${changeColor(sinceAdded)}`}>{formatChange(sinceAdded)}</span>
-              ) : null}
-            </div>
-          )}
-        </section>
+        <PriceFlowSection
+          item={item}
+          isBought={isBought}
+          snapshot={snapshot}
+          quotePending={quotePending}
+          sinceAdded={sinceAdded}
+          sinceBuy={sinceBuy}
+          scenario={scenario}
+        />
 
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold text-muted-foreground">내가 쓴 근거</h2>
