@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { ScreenHeader } from "@/components/layout/screen-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
-import { composeView, useWatchlistItemView } from "@/hooks/use-watchlist-view";
+import { useWatchlistItemView } from "@/hooks/use-watchlist-view";
+import { composeView } from "@/lib/watchlist/compose-view";
 import { getCategory, type CheckType, type FollowupAnswer, type Premise } from "@/lib/mock";
 import { removeWatchlistItemAction } from "@/app/actions";
 

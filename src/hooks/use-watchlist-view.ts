@@ -7,10 +7,10 @@ import {
   loadWatchlistList,
   loadWatchlistQuotes,
 } from "@/app/actions";
-import { resolvePremises } from "@/lib/premises/engine";
 import type { DemoScenario, QuoteSnapshot } from "@/lib/mock/types";
-import { QUOTE_FAILED, QUOTE_LOADING, settledQuote, snapshotOf, type QuoteState } from "@/lib/quote/quote-state";
-import type { SettledWatchlistItem, WatchlistListItem, WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
+import { QUOTE_FAILED, QUOTE_LOADING, settledQuote, type QuoteState } from "@/lib/quote/quote-state";
+import { composeView } from "@/lib/watchlist/compose-view";
+import type { SettledWatchlistItem, WatchlistListItem } from "@/lib/watchlist/get-watchlist";
 
 /** ADR-0002: 목록은 60초, 시세는 20초 — 재방문 시 캐시가 신선하면 즉시 렌더하고 조용히 갱신한다. */
 const LIST_STALE_TIME_MS = 60_000;
@@ -27,25 +27,6 @@ function toTickerKey(items: { ticker: string }[]): string {
     .map((i) => i.ticker)
     .sort()
     .join(",");
-}
-
-/**
- * ADR-0004의 불변식이 사는 곳: **배지는 화면에 그리는 바로 그 시세에서 나온다.**
- * 목록(시점과 무관한 DB 사실)과 시세를 만나게 하는 자리가 여기 하나뿐이어야, 가격만
- * 바뀌고 배지가 과거에 남는 일이 구조적으로 불가능해진다. 화면마다 이 합성을 다시 쓰면
- * 그 불변식도 화면 수만큼 복제된다 — 이미 한 번 버그로 드러난 지점이다.
- */
-export function composeView(
-  item: WatchlistListItem,
-  quote: QuoteState
-): WatchlistViewItem {
-  return {
-    ...item,
-    quote,
-    thesis: item.thesis
-      ? { ...item.thesis, premises: resolvePremises(item.thesis.premises, snapshotOf(quote)) }
-      : undefined,
-  };
 }
 
 /**
