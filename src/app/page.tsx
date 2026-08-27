@@ -130,6 +130,42 @@ function StockCard({
   );
 }
 
+/**
+ * 로딩 중 카드 자리. 실제 `StockCard`와 같은 컨테이너·같은 요소 배치를 써서 로드 전후의
+ * 높이가 어긋나지 않게 한다. 구매 버튼은 관심종목 섹션에만 있으므로 여기서도 갈린다.
+ */
+function StockCardSkeleton({ withBuyButton }: { withBuyButton: boolean }) {
+  return (
+    <div className="flex w-full items-center gap-3 rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <Skeleton className="h-5 w-28" />
+        <Skeleton className="h-5 w-16 rounded-4xl" />
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <Skeleton className="h-5 w-20" />
+        <Skeleton className="h-4 w-10" />
+      </div>
+      {withBuyButton ? <Skeleton className="h-8 w-14 rounded-md" /> : null}
+    </div>
+  );
+}
+
+// 관심종목 3장, 보유중 2장. 보유중을 스켈레톤으로 약속해도 되는 이유는 이 데모에서
+// 보유중이 항상 정확히 2건이기 때문이다 — 시드가 `bought` 2건을 넣고(`seed-data.ts`),
+// 보유중에는 제거 경로가 없다(S5의 "관심종목에서 제외"는 `!isBought`일 때만 뜬다).
+const WATCHING_SKELETON_COUNT = 3;
+const BOUGHT_SKELETON_COUNT = 2;
+
+function SkeletonList({ count, withBuyButton }: { count: number; withBuyButton: boolean }) {
+  return (
+    <div className="flex flex-col gap-2">
+      {Array.from({ length: count }, (_, i) => (
+        <StockCardSkeleton key={i} withBuyButton={withBuyButton} />
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
   const { scenario, toggle, hydrated } = useDemoScenario();
@@ -183,9 +219,7 @@ export default function Home() {
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold text-muted-foreground">관심종목</h2>
           {loading ? (
-            <p className="rounded-2xl bg-muted px-4 py-6 text-center text-sm text-muted-foreground">
-              불러오는 중...
-            </p>
+            <SkeletonList count={WATCHING_SKELETON_COUNT} withBuyButton />
           ) : watching.length > 0 ? (
             <div className="flex flex-col gap-2">
               {watching.map((item) => (
@@ -208,14 +242,18 @@ export default function Home() {
           </Link>
         </section>
 
-        {bought.length > 0 ? (
+        {loading || bought.length > 0 ? (
           <section className="flex flex-col gap-2">
             <h2 className="text-sm font-semibold text-muted-foreground">보유중</h2>
-            <div className="flex flex-col gap-2">
-              {bought.map((item) => (
-                <StockCard key={item.id} item={item} />
-              ))}
-            </div>
+            {loading ? (
+              <SkeletonList count={BOUGHT_SKELETON_COUNT} withBuyButton={false} />
+            ) : (
+              <div className="flex flex-col gap-2">
+                {bought.map((item) => (
+                  <StockCard key={item.id} item={item} />
+                ))}
+              </div>
+            )}
           </section>
         ) : null}
       </div>
