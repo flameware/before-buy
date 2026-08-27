@@ -1,4 +1,24 @@
-import type { Premise, QuoteSnapshot, Thesis, WatchlistItem } from "./types";
+import type { Premise, PremiseCheckConfig, QuoteSnapshot, Thesis, WatchlistItem } from "./types";
+
+/**
+ * 시드 전제 중 price/valuation 타입의 자동 판정 설정. 아래 시드 문구(예: "10만
+ * 5,000원 이하일 때 저평가")를 엔진이 읽을 수 있는 {kind,metric,value}로 고정
+ * 매핑한다 — qualitative 전제(seed-b-p3)는 자동 판정 대상이 아니므로 여기 없다.
+ *
+ * 방향은 `kind`가 결정한다 (ADR-0007). 이전에는 `operator`를 여기서 직접 골랐고,
+ * 그 탓에 "목표가 210,000원"이 `lte`로 적혀 도달 목표가 유지 조건처럼 판정됐다.
+ *
+ * 프로비저닝(db/seed.ts)이 아니라 시드 정의 옆에 둔다. 서버 전용 모듈에 두면
+ * 앱 밖의 유지보수 스크립트가 이 값을 읽지 못해 그대로 옮겨 적게 되고, 그렇게 갈린
+ * 사본이 낡는 것이 #88이 남긴 교훈이다.
+ */
+export const SEED_PREMISE_CHECK_CONFIG: Record<string, PremiseCheckConfig> = {
+  "seed-a-p1": { kind: "value-ceiling", value: 105_000 },
+  "seed-b-p1": { kind: "value-ceiling", metric: "per", value: 44 },
+  "seed-b-p2": { kind: "target-price", value: 210_000 },
+  "seed-d-p1": { kind: "value-ceiling", value: 275_000 },
+  "seed-e-p1": { kind: "value-ceiling", value: 48_500 },
+};
 
 /**
  * 데모 시드 5종 (기술스펙 7장). "현재" / "3개월 후" 두 값을 각각 들고 있다가
@@ -7,8 +27,7 @@ import type { Premise, QuoteSnapshot, Thesis, WatchlistItem } from "./types";
  *
  * price/valuation 전제의 자동 판정(engine.ts)은 현재 시점(isFuture=false)에는
  * 시드 종목도 실시간 KIS 시세를 baseline으로 쓴다 — 여기 적힌 "current" 값이
- * 아니라 `SEED_PREMISE_CHECK_CONFIG`(db/seed.ts)의 임계값과 그 실시간 시세를
- * 비교한다. 그래서 이 임계값들은 2026-08-26 KIS 실측가 기준으로 맞춰뒀다.
+ * 아니라 위 `SEED_PREMISE_CHECK_CONFIG`의 임계값과 그 실시간 시세를 비교한다. 그래서 이 임계값들은 2026-08-26 KIS 실측가 기준으로 맞춰뒀다.
  * 절대값 비교라 시세가 계속 움직이면 다시 깨질 수 있다는 점은 감수한다
  * (issue #65).
  */
