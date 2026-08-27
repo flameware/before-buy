@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { badgeDisplay, badgeLabel, badgeState, countByJudgment } from "./badge";
+import { badgeDisplay, badgeLabel, badgeState, countByJudgment, type BadgeDisplay } from "./badge";
 import { QUOTE_FAILED, QUOTE_LOADING, type QuoteState } from "@/lib/quote/quote-state";
 import type { BadgeState, Premise, QuoteSnapshot, Thesis, WatchlistItem } from "@/lib/mock/types";
 
@@ -112,12 +112,70 @@ describe("badgeDisplay", () => {
     expect(badgeDisplay(manualOnly, quote)).toEqual({ kind: "badge", state: "intact" });
   });
 
-  // 시세가 와도 풀리지 않는 전제(`unreadable`)뿐인 종목에 "시세를 불러오지 못해"라고
-  // 말하면, 시세가 돌아오는 순간 배지가 "유지 중"으로 바뀌며 앞말이 거짓이 된다.
-  // 시세는 이 종목이 판정되지 않는 이유가 아니다.
-  it("읽을 수 없는 자동 전제뿐이면 조회 실패여도 배지를 그대로 그린다", () => {
+  // #102: 시세는 정상인데 자동 전제가 영구히 판정 불가면 그 종목은 **한 번도 판정된 적이
+  // 없다**. "유지 중"은 판정되지 않은 것에 대한 확신이므로 배지를 그리지 않는다.
+  it("시세는 정상인데 읽을 수 없는 자동 전제가 있으면 판정된 적 없음", () => {
     const unreadable = item({ thesis: thesis([premise("unreadable")]) });
-    expect(badgeDisplay(unreadable, QUOTE_FAILED)).toEqual({ kind: "badge", state: "intact" });
+    expect(badgeDisplay(unreadable, QUOTE_OK)).toEqual({ kind: "unjudged" });
+  });
+
+  it("읽을 수 있는 자동 전제와 섞여 있어도 하나라도 읽을 수 없으면 판정된 적 없음", () => {
+    const mixed = item({ thesis: thesis([premise("intact"), premise("unreadable")]) });
+    expect(badgeDisplay(mixed, QUOTE_OK)).toEqual({ kind: "unjudged" });
+  });
+
+  // 시세가 와도 풀리지 않는 전제(`unreadable`)뿐인 종목에 "시세를 불러오지 못해"라고
+  // 말하면, 시세가 돌아오는 순간 그 말이 거짓이 된다 — 시세는 이 종목이 판정되지 않는
+  // 이유가 아니다. 그 문제의식은 이제 **시세 탓을 하지 않는 별도 갈래**가 지킨다:
+  // `unknown`이 아니라 `unjudged`라 화면이 시세가 아닌 근거를 원인으로 말하고, 시세가
+  // 돌아와도 같은 갈래에 그대로 머문다.
+  it.each([
+    ["조회 실패", QUOTE_FAILED],
+    ["조회 완료", QUOTE_OK],
+  ] as [string, QuoteState][])(
+    "읽을 수 없는 자동 전제뿐이면 %s여도 시세 탓을 하지 않는다",
+    (_label, quote) => {
+      const unreadable = item({ thesis: thesis([premise("unreadable")]) });
+      expect(badgeDisplay(unreadable, quote)).toEqual({ kind: "unjudged" });
+    },
+  );
+
+  // 우선순위 2 > 4: "달라짐"은 하나만 깨져도 참이라 나머지를 판정하지 못해도 이미 확정이다.
+  it.each([
+    ["조회 완료", QUOTE_OK],
+    ["조회 실패", QUOTE_FAILED],
+    ["조회 중", QUOTE_LOADING],
+  ] as [string, QuoteState][])(
+    "깨진 전제와 읽을 수 없는 전제가 함께 있으면 %s와 무관하게 달라짐",
+    (_label, quote) => {
+      const both = item({ thesis: thesis([premise("broken"), premise("unreadable")]) });
+      expect(badgeDisplay(both, quote)).toEqual({ kind: "badge", state: "changed" });
+    },
+  );
+
+  // 우선순위 3 > 4: 시세 축은 재시도로 풀릴 수 있고, 풀린 뒤에도 `unreadable`은 그대로
+  // 남아 그때 4로 넘어간다. 순서가 뒤집히면 재시도로 풀릴 일을 영구 판정 불가처럼 말한다.
+  it.each([
+    ["조회 중", QUOTE_LOADING, { kind: "pending" }],
+    ["조회 실패", QUOTE_FAILED, { kind: "unknown" }],
+  ] as [string, QuoteState, BadgeDisplay][])(
+    "읽을 수 없는 전제와 %s가 겹치면 시세 축이 이긴다",
+    (_label, quote, expected) => {
+      const both = item({ thesis: thesis([premise("pending"), premise("unreadable")]) });
+      expect(badgeDisplay(both, quote)).toEqual(expected);
+    },
+  );
+
+  // 우선순위 1 > 4. 근거가 없으면 읽을 수 없는 전제도 있을 수 없지만, 순서를 잠가둔다.
+  it("근거가 없으면 시세가 정상이어도 근거 없음", () => {
+    expect(badgeDisplay(item(), QUOTE_OK)).toEqual({ kind: "badge", state: "no-thesis" });
+  });
+
+  // 직접 확인 전제는 자동 판정 대상이 아니므로 두 축 모두를 비껴간다 — `unreadable`을
+  // 자동 전제로 한정해 묻지 않으면 이 종목까지 배지를 잃는다.
+  it("직접 확인 전제만 있으면 상태와 무관하게 배지를 그대로 그린다", () => {
+    const manualOnly = item({ thesis: thesis([manualPremise(), manualPremise("unreadable")]) });
+    expect(badgeDisplay(manualOnly, QUOTE_OK)).toEqual({ kind: "badge", state: "intact" });
   });
 
   it.each([
@@ -141,25 +199,35 @@ describe("countByJudgment", () => {
     quote,
   });
 
-  it("달라짐과 판정 불가를 한 번에 센다", () => {
+  it("달라짐·시세 판정 불가·판정된 적 없음을 한 번에 센다", () => {
     const items = [
       withQuote({ id: "a", thesis: thesis([premise("broken")]) }, QUOTE_OK),
       withQuote({ id: "b", thesis: thesis([premise("broken"), premise("pending")]) }, QUOTE_FAILED),
       withQuote({ id: "c", thesis: thesis([premise("pending")]) }, QUOTE_FAILED),
       withQuote({ id: "d", thesis: thesis([premise("intact")]) }, QUOTE_OK),
       withQuote({ id: "e" }, QUOTE_FAILED),
+      withQuote({ id: "f", thesis: thesis([premise("unreadable")]) }, QUOTE_OK),
     ];
-    expect(countByJudgment(items)).toEqual({ changed: 2, unknown: 1 });
+    expect(countByJudgment(items)).toEqual({ changed: 2, unknown: 1, unjudged: 1 });
+  });
+
+  // 두 축은 합산되지 않는다 — 헤더가 두 문장을 따로 띄우려면 수도 따로 와야 한다(#102).
+  it("시세 실패와 판정된 적 없음을 합산하지 않는다", () => {
+    const items = [
+      withQuote({ id: "a", thesis: thesis([premise("pending")]) }, QUOTE_FAILED),
+      withQuote({ id: "b", thesis: thesis([premise("unreadable")]) }, QUOTE_OK),
+    ];
+    expect(countByJudgment(items)).toEqual({ changed: 0, unknown: 1, unjudged: 1 });
   });
 
   // 조회 중은 판정 불가가 아니다 — 아직 시도가 끝나지 않았으므로 헤더가 그 수를
   // 말하기 시작하면 시세가 오는 순간 사라질 문장을 보여주게 된다.
   it("조회 중은 어느 쪽에도 세지 않는다", () => {
     const items = [withQuote({ id: "a", thesis: thesis([premise("pending")]) }, QUOTE_LOADING)];
-    expect(countByJudgment(items)).toEqual({ changed: 0, unknown: 0 });
+    expect(countByJudgment(items)).toEqual({ changed: 0, unknown: 0, unjudged: 0 });
   });
 
-  it("빈 목록은 둘 다 0", () => {
-    expect(countByJudgment([])).toEqual({ changed: 0, unknown: 0 });
+  it("빈 목록은 셋 다 0", () => {
+    expect(countByJudgment([])).toEqual({ changed: 0, unknown: 0, unjudged: 0 });
   });
 });

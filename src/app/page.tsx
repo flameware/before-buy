@@ -83,6 +83,14 @@ function StockCard({
           <Badge variant={badgeVariant(badge.state)}>{badgeLabel(badge.state)}</Badge>
         ) : badge.kind === "pending" ? (
           <Skeleton className="h-5 w-16 rounded-4xl" />
+        ) : badge.kind === "unjudged" ? (
+          // 판정된 적 없음 — 배지 자리를 비우되 **이 자리가** 사정을 말한다. 시세는 정상이라
+          // 오른쪽에는 평범한 현재가가 떠 있고, 그래서 "시세 조회 실패"를 빌려 쓸 수 없다(#102).
+          <div className="flex h-5 items-center">
+            <span className="truncate text-xs text-muted-foreground">
+              시스템이 확인할 수 없는 근거가 있어요
+            </span>
+          </div>
         ) : (
           // 판정 불가 — 배지 자리를 비운다. 오른쪽의 "시세 조회 실패"가 그 사정을 말한다.
           // 자리는 그대로 두어(높이 유지) 카드가 목록 안에서 혼자 짧아지지 않게 한다.
@@ -181,10 +189,14 @@ export default function Home() {
   const { items: watchlist, isLoading: loading } = useWatchlistView(scenario, hydrated);
 
   const { watching, bought } = splitByStatus(watchlist);
-  // 달라짐과 판정 불가를 한 번에 센다 — 변동 요약 토스트는 판정된 것만 세고, 시세를 못
-  // 불러와 판정하지 못한 종목은 헤더의 정적 줄이 따로 말한다. 예전에는 후자가 "유지 중"으로
-  // 접혀 요약 자체가 조용히 사라졌다(#81).
-  const { changed: numChanged, unknown: numUnknown } = countByJudgment(watchlist);
+  // 달라짐과 두 갈래의 판정 불가를 한 번에 센다 — 변동 요약 토스트는 판정된 것만 세고,
+  // 판정하지 못한 종목은 헤더의 정적 줄이 따로 말한다. 예전에는 후자가 "유지 중"으로 접혀
+  // 요약 자체가 조용히 사라졌다(#81, #102).
+  const {
+    changed: numChanged,
+    unknown: numUnknown,
+    unjudged: numUnjudged,
+  } = countByJudgment(watchlist);
   useChangeSummaryToast(numChanged);
 
   useEffect(() => {
@@ -223,6 +235,13 @@ export default function Home() {
         {numUnknown > 0 ? (
           <p className="text-xs text-muted-foreground">
             {numUnknown}개 종목은 시세를 불러오지 못해 확인할 수 없어요
+          </p>
+        ) : null}
+        {/* 시세 문장과 **나란히 서는 별도 문장**이다 — 합산하면 한 문장이 두 원인을 뭉뚱그려
+            둘 중 한쪽 종목에는 반드시 거짓이 된다(#102). 두 축이 동시에 있으면 둘 다 뜬다. */}
+        {numUnjudged > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {numUnjudged}개 종목은 시스템이 확인할 수 없는 근거가 있어요
           </p>
         ) : null}
       </header>
