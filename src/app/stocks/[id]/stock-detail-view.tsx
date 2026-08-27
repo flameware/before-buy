@@ -41,7 +41,7 @@ function followupSummary(category: Parameters<typeof getCategory>[0], followup: 
   return followup.map((a) => {
     const question = def.questions.find((q) => q.id === a.questionId);
     const prompt = question?.prompt ?? a.questionId;
-    if (a.skipped) return { prompt, answer: "건너뜀" };
+    if (a.skipped) return { prompt, answer: "답하지 않음" };
     const option = question?.options.find((o) => o.value === a.selected);
     const answer = a.freeText ? (option ? `${option.label} · ${a.freeText}` : a.freeText) : (option?.label ?? "-");
     return { prompt, answer };

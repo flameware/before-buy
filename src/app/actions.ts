@@ -6,6 +6,7 @@ import { getExistingThesis } from "@/lib/thesis/get-existing-thesis";
 import type { CritiqueOutput } from "@/lib/llm/types";
 import { getWatchlistListView, getWatchlistQuoteMap, type SettledWatchlistItem, type WatchlistListItem } from "@/lib/watchlist/get-watchlist";
 import { getWatchlistItemDetail, getWatchlistItemForOrder, removeWatchlistItem } from "@/lib/watchlist/get-watchlist-item";
+import { addWatchlistItemWithoutThesis } from "@/lib/watchlist/add-without-thesis";
 import { recordOrderEvent, recordOrderEventByTicker, type OrderEventInput } from "@/lib/order/record-order-event";
 import { getListedStocks } from "@/lib/kis/stock-master";
 import { SEARCH_RESULT_LIMIT, searchStockMaster } from "@/lib/kis/stock-master-parse";
@@ -49,6 +50,16 @@ export async function commitThesisAction(
   quote: QuoteSnapshot
 ): Promise<void> {
   return commitThesis(ticker, draft, critique, quote);
+}
+
+/**
+ * S2 Step 1 "건너뛰기": 근거 없이 종목만 담는다 (#96).
+ *
+ * S3를 거치지 않으므로 LLM 호출도 critique도 없다. 담은 날 가격을 위한 KIS 왕복
+ * 한 번이 전부이고, 그마저 실패해도 담기는 성공한다.
+ */
+export async function addWithoutThesisAction(ticker: string): Promise<void> {
+  return addWatchlistItemWithoutThesis(ticker);
 }
 
 /** S4 진입: 세션 소유 관심종목을 ticker로 조회한다. 전제 상태는 이 시점 시세로 계산된다. */

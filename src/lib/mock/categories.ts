@@ -18,7 +18,6 @@ export interface FollowupQuestion {
 export interface CategoryDef {
   id: ThesisCategory;
   label: string; // Step 1 카드에 쓰는 한 단어 라벨
-  headline: string; // Step 1 헤드라인
   questions: FollowupQuestion[];
 }
 
@@ -26,7 +25,6 @@ export const CATEGORIES: CategoryDef[] = [
   {
     id: "fundamental",
     label: "실적·성장",
-    headline: "왜 이 종목에 관심이 있으세요?",
     questions: [
       {
         id: "growth-type",
@@ -47,7 +45,7 @@ export const CATEGORIES: CategoryDef[] = [
           { value: "next-quarter", label: "다음 분기" },
           { value: "6m", label: "6개월" },
           { value: "1y", label: "1년" },
-          { value: "unset", label: "정해두지 않음" },
+          { value: "unset", label: "정하지 않음" },
         ],
         allowsFreeText: false,
         isValueQuestion: true,
@@ -68,7 +66,6 @@ export const CATEGORIES: CategoryDef[] = [
   {
     id: "undervalued",
     label: "저평가",
-    headline: "왜 이 종목에 관심이 있으세요?",
     questions: [
       {
         id: "cheap-vs-what",
@@ -108,7 +105,6 @@ export const CATEGORIES: CategoryDef[] = [
   {
     id: "theme",
     label: "테마·모멘텀",
-    headline: "왜 이 종목에 관심이 있으세요?",
     questions: [
       {
         id: "theme-name",
@@ -146,7 +142,6 @@ export const CATEGORIES: CategoryDef[] = [
   {
     id: "dividend",
     label: "배당",
-    headline: "왜 이 종목에 관심이 있으세요?",
     questions: [
       {
         id: "yield-checked",
@@ -187,7 +182,6 @@ export const CATEGORIES: CategoryDef[] = [
   {
     id: "technical",
     label: "기술적 신호",
-    headline: "왜 이 종목에 관심이 있으세요?",
     questions: [
       {
         id: "signal-type",
@@ -228,7 +222,6 @@ export const CATEGORIES: CategoryDef[] = [
   {
     id: "recommended",
     label: "누가 추천해서",
-    headline: "왜 이 종목에 관심이 있으세요?",
     questions: [
       {
         id: "source",
@@ -266,7 +259,6 @@ export const CATEGORIES: CategoryDef[] = [
   {
     id: "gut",
     label: "그냥 느낌",
-    headline: "왜 이 종목에 관심이 있으세요?",
     questions: [
       {
         id: "feeling",

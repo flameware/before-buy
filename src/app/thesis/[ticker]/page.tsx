@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { isTickerShaped } from "@/lib/kis/stock-master-parse";
 import { resolveStock } from "@/lib/stock/resolve-stock";
+import { isTickerWatched } from "@/lib/watchlist/get-watchlist-item";
 import { ThesisFlow } from "./thesis-flow";
 
 // S2 근거 입력 (3-step)
@@ -13,6 +14,14 @@ export default async function ThesisPage({
   const { ticker } = await params;
   if (!isTickerShaped(ticker)) notFound();
 
-  const stock = await resolveStock(ticker);
-  return <ThesisFlow ticker={stock.ticker} stockName={stock.name} />;
+  // 이미 담긴 종목이면 Step 1의 "건너뛰기"를 감춘다 — 근거 없이 한 번 더 담아
+  // 중복 카드를 만드는 길을 열어두지 않는다 (#96). 클라이언트 캐시가 아니라 여기서
+  // 판정하는 이유는 직접 URL 진입·새로고침에도 답이 같아야 하기 때문이다.
+  const [stock, alreadyWatched] = await Promise.all([
+    resolveStock(ticker),
+    isTickerWatched(ticker),
+  ]);
+  return (
+    <ThesisFlow ticker={stock.ticker} stockName={stock.name} alreadyWatched={alreadyWatched} />
+  );
 }

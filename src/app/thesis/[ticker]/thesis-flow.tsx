@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { ScreenHeader } from "@/components/layout/screen-header";
+import { addWithoutThesisAction } from "@/app/actions";
+import { canLeaveFollowups, toFollowupAnswers } from "@/lib/thesis/followup-answers";
 import {
   CATEGORIES,
   getCategory,
@@ -27,14 +29,6 @@ function optionsFor(question: FollowupQuestion) {
   return question.options;
 }
 
-function isAnswered(question: FollowupQuestion, answer: FollowupAnswer | undefined): boolean {
-  if (!answer) return false;
-  if (answer.skipped) return true;
-  if (question.options.length === 0) return !!answer.freeText?.trim();
-  if (answer.selected === CUSTOM_VALUE) return !!answer.freeText?.trim();
-  return !!answer.selected;
-}
-
 function QuestionCard({
   question,
   answer,
@@ -47,80 +41,76 @@ function QuestionCard({
   const options = optionsFor(question);
   const showFreeText = options.length === 0 || answer?.selected === CUSTOM_VALUE;
 
+  /**
+   * 선택지는 토글이다 — 고른 칩을 다시 누르면 해제되고, 해제된 문항은 건너뛴 것이 된다.
+   * `직접 입력`을 해제할 때 freeText도 함께 버리는 게 중요하다: 화면에서 지웠다고 믿은
+   * 말이 followup에 남아 LLM 반론의 근거로 되돌아오면 안 된다 (#96).
+   */
+  function toggle(value: string) {
+    if (answer?.selected === value) {
+      onChange({ questionId: question.id });
+      return;
+    }
+    onChange({
+      questionId: question.id,
+      selected: value,
+      freeText: value === CUSTOM_VALUE ? answer?.freeText : undefined,
+    });
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium">{question.prompt}</p>
-        {!answer?.skipped ? (
-          <button
-            type="button"
-            onClick={() => onChange({ questionId: question.id, skipped: true })}
-            className="text-xs text-muted-foreground underline"
-          >
-            건너뛰기
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onChange({ questionId: question.id })}
-            className="text-xs text-muted-foreground underline"
-          >
-            다시 답하기
-          </button>
-        )}
-      </div>
+      <p className="text-sm font-medium">{question.prompt}</p>
 
-      {answer?.skipped ? (
-        <p className="text-xs text-muted-foreground">건너뛰었어요.</p>
-      ) : (
-        <>
-          {options.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {options.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() =>
-                    onChange({
-                      questionId: question.id,
-                      selected: option.value,
-                      freeText: option.value === CUSTOM_VALUE ? answer?.freeText : undefined,
-                    })
-                  }
-                  className={
-                    "rounded-full border px-3 py-1.5 text-sm transition-colors " +
-                    (answer?.selected === option.value
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-input/30 text-foreground")
-                  }
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          {showFreeText ? (
-            <Input
-              value={answer?.freeText ?? ""}
-              onChange={(e) =>
-                onChange({
-                  questionId: question.id,
-                  selected: options.length > 0 ? CUSTOM_VALUE : undefined,
-                  freeText: e.target.value,
-                })
+      {options.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={answer?.selected === option.value}
+              onClick={() => toggle(option.value)}
+              className={
+                "rounded-full border px-3 py-1.5 text-sm transition-colors " +
+                (answer?.selected === option.value
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-input/30 text-foreground")
               }
-              placeholder="직접 입력해주세요"
-            />
-          ) : null}
-        </>
-      )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {showFreeText ? (
+        <Input
+          value={answer?.freeText ?? ""}
+          onChange={(e) =>
+            onChange({
+              questionId: question.id,
+              selected: options.length > 0 ? CUSTOM_VALUE : undefined,
+              freeText: e.target.value,
+            })
+          }
+          placeholder="직접 입력해주세요"
+        />
+      ) : null}
     </div>
   );
 }
 
-export function ThesisFlow({ ticker, stockName }: { ticker: string; stockName: string }) {
+export function ThesisFlow({
+  ticker,
+  stockName,
+  alreadyWatched,
+}: {
+  ticker: string;
+  stockName: string;
+  alreadyWatched: boolean;
+}) {
   const router = useRouter();
+  const [skipping, startSkip] = useTransition();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [category, setCategory] = useState<ThesisCategory | null>(null);
   const [answers, setAnswers] = useState<Record<string, FollowupAnswer>>({});
@@ -128,10 +118,10 @@ export function ThesisFlow({ ticker, stockName }: { ticker: string; stockName: s
 
   const categoryDef = category ? getCategory(category) : null;
 
-  const step2Complete = useMemo(() => {
-    if (!categoryDef) return false;
-    return categoryDef.questions.every((q) => isAnswered(q, answers[q.id]));
-  }, [categoryDef, answers]);
+  const step2Complete = useMemo(
+    () => !!categoryDef && canLeaveFollowups(categoryDef.questions, answers),
+    [categoryDef, answers]
+  );
 
   function handleBack() {
     if (step === 1) {
@@ -145,11 +135,23 @@ export function ThesisFlow({ ticker, stockName }: { ticker: string; stockName: s
     if (!category) return;
     setThesisDraft(ticker, {
       category,
-      followup: Object.values(answers),
+      followup: toFollowupAnswers(getCategory(category).questions, answers),
       freeText: freeText.trim() || undefined,
       createdAt: new Date().toISOString(),
     });
     router.push(`/thesis/${ticker}/result`);
+  }
+
+  /**
+   * "건너뛰기": 근거 없이 담고 S1으로. 응답을 기다렸다가 이동한다 — 낙관적으로 먼저
+   * 보내면 S1이 "목록을 아직 모르는" 것도 "비어 있는" 것도 아닌 세 번째 상태를
+   * 떠안게 된다 (#94, CONTEXT.md "목록 상태").
+   */
+  function handleSkip() {
+    startSkip(async () => {
+      await addWithoutThesisAction(ticker);
+      router.push(`/?highlight=${ticker}`);
+    });
   }
 
   return (
@@ -160,7 +162,12 @@ export function ThesisFlow({ ticker, stockName }: { ticker: string; stockName: s
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
         {step === 1 ? (
           <>
-            <h2 className="text-lg font-semibold">왜 이 종목에 관심이 있으세요?</h2>
+            <div className="flex flex-col gap-1">
+              <h2 className="text-lg font-semibold">왜 이 종목에 관심이 있으세요?</h2>
+              <p className="text-sm text-muted-foreground">
+                이유를 알려주시면 AI가 놓친 점은 없는지 함께 짚어드려요.
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               {CATEGORIES.map((c) => (
                 <button
@@ -215,9 +222,26 @@ export function ThesisFlow({ ticker, stockName }: { ticker: string; stockName: s
 
       <div className="shrink-0 border-t border-border px-4 py-3">
         {step === 1 ? (
-          <Button className="w-full" disabled={!category} onClick={() => setStep(2)}>
-            다음
-          </Button>
+          <div className="flex flex-col items-center gap-3">
+            {/* 이미 담긴 종목이면 렌더하지 않는다 — 근거 없이 한 번 더 담을 일이 없다. */}
+            {!alreadyWatched ? (
+              <button
+                type="button"
+                onClick={handleSkip}
+                disabled={skipping}
+                className="text-sm text-muted-foreground underline disabled:opacity-50"
+              >
+                {skipping ? "담는 중..." : "건너뛰기"}
+              </button>
+            ) : null}
+            <Button
+              className="w-full"
+              disabled={!category || skipping}
+              onClick={() => setStep(2)}
+            >
+              다음
+            </Button>
+          </div>
         ) : null}
         {step === 2 ? (
           <Button className="w-full" disabled={!step2Complete} onClick={() => setStep(3)}>
