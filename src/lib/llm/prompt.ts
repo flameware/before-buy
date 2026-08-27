@@ -5,6 +5,26 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { ThesisCategory } from "@/lib/mock/types";
 import type { CritiqueInput } from "./types";
 
+/**
+ * 없는 지표로 저평가선 전제를 만들지 말라는 지시. **지키는지는 모델에게 맡기고 코드로 막지
+ * 않는다.** 검증(`findSemanticProblems`)에 규칙으로 넣으면 재시도 실패가 곧 `LLMError`라
+ * PER 없는 종목에서 근거 쓰기 자체가 죽고, 저장 시점에 타입을 `qualitative`로 내리면 실적이
+ * 돌아서 지표가 나오기 시작할 때의 자동 복귀(ADR-0004: 판정은 저장되지 않고 조회할 때마다
+ * 다시 이뤄진다)가 영영 닫힌다.
+ *
+ * ADR-0007과 **같은 원칙의 다른 결론**이다. 거기서 모델에게서 빼앗은 방향(`lte`/`gte`)은
+ * 종류에서 도출되므로 공짜로 빼앗을 수 있었다. 여기서 같은 강도로 빼앗으려면 S2 흐름을
+ * 죽이거나 사용자가 말한 조건을 지워야 한다 — 대가가 있는 자리라 유도 + 관측으로 간다.
+ * 지시를 어긴 응답은 `logUnavailableMetricPremises`가 콘솔 경고로 남긴다 (#111).
+ */
+const UNAVAILABLE_METRIC_RULE = `   현재 지표에 \`정보 없음\`으로 온 지표로는 valuation 전제를 만들지 마세요.
+   그 지표는 앞으로도 오지 않을 수 있어, 시스템이 그 전제를 한 번도 확인하지 못합니다.
+
+   이것은 **지표 하나하나에 대한 규칙**입니다. PER이 \`정보 없음\`이어도 PBR이 왔다면
+   PBR 기준 valuation 전제는 정상이고, 그쪽으로 만들면 됩니다.
+   두 지표가 모두 \`정보 없음\`일 때만 valuation 전제를 만들지 않습니다 —
+   그 자리는 가격 기준(price) 전제가 대신할 수 있습니다.`;
+
 const BASE_SYSTEM_PROMPT = `당신은 개인 투자자가 직접 쓴 투자 근거를 검토하는 도우미입니다.
 사용자가 어떤 종목을 관심종목에 담으면서 "왜 담는지"를 적었고,
 당신은 그 내용을 읽고 빠진 부분이나 앞뒤가 맞지 않는 지점을 짚어줍니다.
@@ -57,6 +77,8 @@ const BASE_SYSTEM_PROMPT = `당신은 개인 투자자가 직접 쓴 투자 근�
    "목표가"의 답은 언제나 target-price입니다.
    statement 문장은 자유롭게 쓰되, kind가 가리키는 것과 같은 것을 말해야 합니다.
 
+${UNAVAILABLE_METRIC_RULE}
+
 5. 사용자에게 보이는 문장은 일상적인 말투로 씁니다.
    대상 필드: counterpoints[].point, counterpoints[].basis,
              open_questions[], premises[].statement, challenge_reason
@@ -85,7 +107,9 @@ const CATEGORY_BLOCKS: Record<ThesisCategory, string> = {
 PER과 PBR이 서로 다른 이야기를 하고 있다면 반드시 다룹니다.
 (예: PER은 낮은데 PBR은 높은 경우, 지금 이익이 유난히 좋다는 뜻일 수 있습니다)
 
-목표가를 답했다면 price 전제로, 지표를 답했다면 valuation 전제로 만듭니다.`,
+목표가를 답했다면 price 전제로, 지표를 답했다면 valuation 전제로 만듭니다.
+단, 사용자가 답한 지표가 \`정보 없음\`으로 왔다면 그 지표로는 만들지 않습니다 —
+값이 온 다른 지표가 있으면 그쪽으로 만들고, 둘 다 없으면 valuation 전제를 만들지 않습니다.`,
 
   fundamental: `기대한 성장이 언제, 어떤 숫자로 확인되는지를 봅니다.
 시점을 정하지 않았다면 그것이 가장 먼저 짚어야 할 지점입니다 — "언제 확인할지 모르면 기대가 틀렸는지도 알 수 없습니다".
@@ -166,7 +190,8 @@ function assistantExample(output: unknown): Anthropic.MessageParam {
   return { role: "assistant", content: JSON.stringify(output) };
 }
 
-export function buildFewShotMessages(): Anthropic.MessageParam[] {
+/** 예시 A — 저평가. PER·PBR이 모두 온 종목. */
+function undervaluedExample(): Anthropic.MessageParam[] {
   return [
     {
       role: "user",
@@ -222,6 +247,76 @@ export function buildFewShotMessages(): Anthropic.MessageParam[] {
         },
       ],
     }),
+  ];
+}
+
+/**
+ * 예시 A의 `정보 없음` 변형. 예시를 **덧붙이지 않고 자리를 대체한다** — 이 파이프라인은
+ * 프롬프트 캐싱을 쓰지 않으므로(클라이언트에 `cache_control`이 없다) 예시를 하나 늘리면
+ * 매 호출 입력 토큰이 영구히 는다. 바꿔 끼우는 것은 공짜다.
+ *
+ * 이 한 벌이 두 가지를 함께 가르친다: 없는 지표(PER)로는 저평가선 전제를 만들지 않는다는
+ * 것, 그리고 그것이 **지표 단위** 규칙이라 살아 있는 지표(PBR)로는 정상적으로 만든다는 것.
+ * 기존 예시 두 벌은 둘 다 지표가 채워진 종목이라, 모델은 `정보 없음`이 들어온 상황의 정답을
+ * 한 번도 본 적이 없었다 (#111).
+ */
+function undervaluedMissingMetricExample(): Anthropic.MessageParam[] {
+  return [
+    {
+      role: "user",
+      content: `종목: 롯데케미칼 (화학)
+카테고리: undervalued
+
+후속 질문 답변:
+- 무엇 대비 싸다고 보세요?
+  → 보유 자산
+- 어느 지표로 보셨어요?
+  → PBR
+- 어디까지 오르면 제값이라고 보세요?
+  → 아직 안 정했어요
+
+자유 서술: 지금은 적자지만 순자산의 절반도 안 되는 값에 거래되고 있습니다
+
+현재 지표: 현재가 63,700원 / PER 정보 없음 / PBR 0.33`,
+    },
+    assistantExample({
+      is_challengeable: true,
+      challenge_reason: "순자산 대비로는 싸지만, 그 순자산이 계속 줄고 있는지는 확인하지 않으셨습니다",
+      counterpoints: [
+        {
+          point: "PBR 0.33배가 싸 보이는 이유가 적자 때문일 수 있습니다.",
+          severity: "major",
+          basis: "적자가 이어지면 순자산 자체가 매 분기 줄어듭니다. 주가가 그대로여도 PBR은 다시 올라가므로, 지금 싼 것이 계속 싼 게 아닐 수 있습니다.",
+        },
+        {
+          point: "언제까지 적자가 이어져도 들고 계실 건가요?",
+          severity: "major",
+          basis: "제값을 받는 시점을 정하지 않으면 생각이 틀렸다는 것을 알아차릴 자리도 없습니다.",
+        },
+      ],
+      open_questions: [
+        "적자에서 벗어나는 시점을 언제쯤으로 보고 계세요?",
+        "순자산이 지금보다 더 줄어들면 그때도 싸다고 보실 건가요?",
+      ],
+      premises: [
+        {
+          statement: "PBR 0.5배 아래를 유지한다",
+          check_type: "valuation",
+          check_config: { kind: "value-ceiling", metric: "pbr", value: 0.5, period: null },
+        },
+        {
+          statement: "분기 실적에서 적자 폭이 줄어드는지 직접 확인한다",
+          check_type: "qualitative",
+          check_config: null,
+        },
+      ],
+    }),
+  ];
+}
+
+/** 예시 B — 반박할 지점이 약한 경우. */
+function technicalExample(): Anthropic.MessageParam[] {
+  return [
     {
       role: "user",
       content: `종목: 삼성전자 (반도체)
@@ -258,4 +353,19 @@ export function buildFewShotMessages(): Anthropic.MessageParam[] {
       ],
     }),
   ];
+}
+
+/**
+ * few-shot은 두 벌 그대로다. 저평가 자리만 입력에 따라 갈린다 — 사용자가 답한 지표가 실제로
+ * 오지 않는 종목이면 그 상황의 정답을 보여주는 변형으로 바꿔 끼운다.
+ * (카테고리 7종별 맞춤 예시는 별건이다 — #114.)
+ */
+export function buildFewShotMessages(input: CritiqueInput): Anthropic.MessageParam[] {
+  const metricMissing = input.per == null || input.pbr == null;
+  const first =
+    input.category === "undervalued" && metricMissing
+      ? undervaluedMissingMetricExample()
+      : undervaluedExample();
+
+  return [...first, ...technicalExample()];
 }

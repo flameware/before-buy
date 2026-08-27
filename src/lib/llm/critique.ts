@@ -25,6 +25,7 @@ import {
   CritiqueRawOutput,
   findSemanticProblems,
   logForbiddenWords,
+  logUnavailableMetricPremises,
   toPremises,
 } from "./schemas";
 import { CritiqueInput, CritiqueOutput, LLMCallLimitExceededError, LLMError } from "./types";
@@ -42,7 +43,7 @@ async function callOnce(input: CritiqueInput): Promise<CritiqueRawOutput> {
     max_tokens: MAX_TOKENS,
     system: buildSystemPrompt(input.category),
     output_config: { format: zodOutputFormat(CritiqueOutputSchema) },
-    messages: [...buildFewShotMessages(), { role: "user", content: buildUserMessage(input) }],
+    messages: [...buildFewShotMessages(input), { role: "user", content: buildUserMessage(input) }],
   });
 
   if (message.stop_reason === "max_tokens") {
@@ -91,6 +92,8 @@ export async function generateCritiqueAndPremises(input: CritiqueInput): Promise
 
   const parsed = await callWithValidationRetry(input);
   logForbiddenWords(parsed);
+  // 경고만 남기고 흐름은 그대로 둔다 — 이 전제는 검증에 걸리지 않고 그대로 저장된다 (#111).
+  logUnavailableMetricPremises(parsed, { per: input.per, pbr: input.pbr });
 
   return {
     isChallengeable: parsed.is_challengeable,

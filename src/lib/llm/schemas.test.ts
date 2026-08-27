@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findSemanticProblems } from "./schemas";
+import { findSemanticProblems, findUnavailableMetricPremises } from "./schemas";
 import type { CritiqueRawOutput } from "./schemas";
 
 const ANCHOR = 401_000;
@@ -119,6 +119,71 @@ describe("findSemanticProblems — check_type과 kind의 정합", () => {
       findSemanticProblems(
         output([{ statement: "전제", check_type: "qualitative", check_config: null }]),
         ANCHOR
+      )
+    ).toEqual([]);
+  });
+});
+
+function valuationPremise(
+  metric: "per" | "pbr",
+  value: number
+): CritiqueRawOutput["premises"][number] {
+  return {
+    statement: `${metric.toUpperCase()} ${value}배 아래를 유지한다`,
+    check_type: "valuation",
+    check_config: { kind: "value-ceiling", metric, value, period: null },
+  };
+}
+
+// #111 회귀 잠금: 이 종목에 오지 않는 지표로 만든 저평가선 전제는 저장되는 순간부터 영구히
+// 읽을 수 없음이다. 막지는 않되(막으면 S2 흐름이 죽는다) 아무도 모르는 상태로 두지 않는다.
+describe("findUnavailableMetricPremises — 없는 지표를 쓴 저평가선 전제", () => {
+  it("지표가 하나도 없으면 valuation 전제를 잡아낸다", () => {
+    const found = findUnavailableMetricPremises(output([valuationPremise("per", 15)]), {});
+    expect(found).toEqual([{ index: 0, metric: "per", statement: "PER 15배 아래를 유지한다" }]);
+  });
+
+  it("지표가 있으면 잡아내지 않는다 — 오탐 없음", () => {
+    expect(
+      findUnavailableMetricPremises(output([valuationPremise("per", 15)]), { per: 7.53, pbr: 4.56 })
+    ).toEqual([]);
+  });
+
+  // 판정 단위가 지표 하나라는 것 — PER이 없어도 PBR 전제는 정상이다.
+  it("한쪽만 없으면 없는 쪽만 잡아낸다", () => {
+    const found = findUnavailableMetricPremises(
+      output([valuationPremise("per", 15), valuationPremise("pbr", 0.5)]),
+      { pbr: 0.33 }
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ index: 0, metric: "per" });
+  });
+
+  it("가격·실적·직접 확인 전제는 지표가 없어도 잡아내지 않는다", () => {
+    expect(
+      findUnavailableMetricPremises(
+        output([
+          pricePremise({ kind: "stop-loss", value: 360_900 }),
+          { statement: "전제", check_type: "fundamental", check_config: null },
+          { statement: "전제", check_type: "qualitative", check_config: null },
+        ]),
+        {}
+      )
+    ).toEqual([]);
+  });
+
+  // 형식 검증(findSemanticProblems)이 이미 잡는 자리다. 경고까지 겹쳐 내지 않는다.
+  it("metric이 비어 있는 valuation 전제는 이 함수의 몫이 아니다", () => {
+    expect(
+      findUnavailableMetricPremises(
+        output([
+          {
+            statement: "전제",
+            check_type: "valuation",
+            check_config: { kind: "value-ceiling", metric: null, value: 15, period: null },
+          },
+        ]),
+        {}
       )
     ).toEqual([]);
   });
