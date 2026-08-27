@@ -35,7 +35,9 @@ export function PhoneFrame({
           // containing block으로 만든다 — 없으면 bottom sheet가 데스크톱 너비에서 프레임을
           // 벗어나 브라우저 전체를 덮는다. Drawer 쪽에서 이 엘리먼트로 직접 portal해야 실제로 적용된다.
           "group relative flex h-dvh w-full flex-col overflow-hidden bg-background [contain:layout]",
-          "sm:h-[874px] sm:w-[402px] sm:rounded-[2.5rem] sm:border sm:border-border sm:shadow-xl",
+          // PROTOTYPE(#frame-radius): 곡률을 `--frame-radius`로 뽑아 조절 바가 라이브로 돌릴 수 있게 했다.
+          // 값이 확정되면 변수를 지우고 확정값 한 줄로 되돌린다. 폴백 2.5rem = 기존 값.
+          "sm:h-[874px] sm:w-[402px] sm:rounded-[var(--frame-radius,2.5rem)] sm:border sm:border-border sm:shadow-xl",
         )}
       >
         {/* Provider가 `children`까지 감싸는 이유: 화면 안에서 여는 오버레이(S5의 관심종목

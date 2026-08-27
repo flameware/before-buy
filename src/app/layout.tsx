@@ -3,6 +3,8 @@ import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { PhoneFrame } from "@/components/layout/phone-frame";
+// PROTOTYPE(#frame-radius) — 값 확정 후 이 import와 아래 마운트를 지운다.
+import { FrameRadiusPrototypeBar } from "@/components/layout/frame-radius-prototype-bar";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ToastProvider } from "@/components/ui/toast";
 
@@ -35,6 +37,9 @@ export default function RootLayout({ children, modal }: LayoutProps<"/">) {
         <QueryProvider>
           <ToastProvider>
             <PhoneFrame modal={modal}>{children}</PhoneFrame>
+            {/* PROTOTYPE(#frame-radius) — 프레임 바깥 형제로 둔다. 프레임 안에 넣으면
+                `[contain:layout]`에 갇혀 액자 안에서만 뜬다. */}
+            {process.env.NODE_ENV !== "production" ? <FrameRadiusPrototypeBar /> : null}
           </ToastProvider>
         </QueryProvider>
       </body>
