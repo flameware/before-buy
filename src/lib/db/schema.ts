@@ -74,6 +74,8 @@ export const premises = pgTable("premises", {
   checkConfig: jsonb("check_config"), // {kind, metric, value, period} — 방향은 kind가 결정 (ADR-0007)
   // ADR-0004: status/observed_value는 fundamental|qualitative 전제에만 의미가 있다.
   // price|valuation 전제는 저장된 값을 무시하고 조회 시 시세로 계산한다.
+  // 계산으로만 나오는 unreadable(#88)은 여기 저장되지 않는다 — 자동 전제의 status는
+  // 애초에 조회 시 계산되므로.
   status: text("status").notNull(), // intact | broken | pending | manual
   observedValue: text("observed_value"),
 });

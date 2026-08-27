@@ -25,6 +25,11 @@ const AUTO_CHECK_TYPES = new Set<Premise["checkType"]>(["price", "valuation"]);
 
 const PREMISE_KINDS: readonly PremiseKind[] = ["stop-loss", "value-ceiling", "target-price"];
 
+/** 시스템이 시세로 대신 봐주는 전제인가. 배지 라벨과 판정 대상이 여기서 갈린다. */
+export function isAutoCheck(checkType: Premise["checkType"]): boolean {
+  return AUTO_CHECK_TYPES.has(checkType);
+}
+
 /**
  * 배지에 투표할 자격이 있는 전제인가 — 즉 **유지 조건**인가. 도달 목표는 자격이 없다:
  * 목표가에 아직 닿지 않은 것은 생각이 틀어진 게 아니라 진행 중인 것이다(#85).
@@ -43,8 +48,6 @@ export function resolvePremises(premises: Premise[], quote: QuoteSnapshot | null
     if (!AUTO_CHECK_TYPES.has(premise.checkType)) return premise;
 
     const result = evaluateCheck(premise.checkType, premise.checkConfig, quote);
-    if (!result) return { ...premise, status: "pending", observedValue: undefined };
-
     return { ...premise, status: result.status, observedValue: result.observedValue };
   });
 }
@@ -60,28 +63,43 @@ export function hasAutoPremise(premises: Premise[]): boolean {
 
 interface CheckResult {
   status: PremiseStatus;
-  observedValue: string;
+  observedValue?: string;
 }
 
+/** 시세를 더 기다리면 풀릴 자리. 관측값은 아직 없다. */
+const WAITING: CheckResult = { status: "pending" };
+
+/** 사용자가 근거를 다시 쓰기 전에는 풀리지 않는 자리 (#88). */
+const UNREADABLE: CheckResult = { status: "unreadable" };
+
+/**
+ * 판정이 안 나올 때 그 이유를 갈라 돌려준다. **시세가 없어서**면 `pending`,
+ * **설정을 읽을 수 없어서**면 `unreadable` — 앞은 기다리면 풀리고 뒤는 그렇지 않다.
+ * 한 값으로 뭉개면 화면이 영구 판정 불가에도 "잠시 기다리는 중"처럼 안내하게 된다.
+ *
+ * 시세에 PER·PBR이 없는 경우는 `pending`이다. 전제의 설정이 아니라 시세 쪽이 비어 있는
+ * 것이라, 근거를 다시 써도 풀리지 않는다.
+ */
 function evaluateCheck(
   checkType: Premise["checkType"],
   config: PremiseCheckConfig | undefined,
   quote: QuoteSnapshot | null
-): CheckResult | null {
-  if (!quote || config?.kind == null || config.value == null) return null;
+): CheckResult {
+  if (config?.kind == null || config.value == null) return UNREADABLE;
+  if (!quote) return WAITING;
 
   if (checkType === "price") {
     return judge(quote.price, config.kind, config.value, formatWon);
   }
 
   if (checkType === "valuation") {
-    if (!config.metric) return null;
+    if (!config.metric) return UNREADABLE;
     const observed = quote[config.metric];
-    if (observed == null) return null;
+    if (observed == null) return WAITING;
     return judge(observed, config.kind, config.value, formatMultiple);
   }
 
-  return null;
+  return UNREADABLE;
 }
 
 /**

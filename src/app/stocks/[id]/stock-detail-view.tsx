@@ -9,7 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
 import { useWatchlistItemView } from "@/hooks/use-watchlist-view";
 import { composeView } from "@/lib/watchlist/compose-view";
-import { getCategory, type CheckType, type FollowupAnswer, type Premise } from "@/lib/mock";
+import { premiseDisplay } from "@/lib/premises/display";
+import { getCategory, type FollowupAnswer, type Premise } from "@/lib/mock";
 import { removeWatchlistItemAction } from "@/app/actions";
 
 const priceFormat = new Intl.NumberFormat("ko-KR");
@@ -34,10 +35,6 @@ function formatDate(iso: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-function isAutoCheck(checkType: CheckType): boolean {
-  return checkType === "price" || checkType === "valuation";
-}
-
 function followupSummary(category: Parameters<typeof getCategory>[0], followup: FollowupAnswer[]) {
   const def = getCategory(category);
   return followup.map((a) => {
@@ -51,36 +48,25 @@ function followupSummary(category: Parameters<typeof getCategory>[0], followup: 
 }
 
 /**
- * `quotePending`이면 자동 확인 전제의 **상태 줄만** 가린다. "자동 확인 / 직접 확인 필요"
- * 배지는 전제의 종류라 시세와 무관하게 늘 확정이고, 시세를 기다리는 동안 자동 전제는
- * `pending`이라 "아직 직접 확인이 필요해요"라는 엉뚱한 안내가 나가기 때문이다.
+ * 배지와 그 아래 문구는 `premiseDisplay` 한 곳에서 함께 결정된다 — 여기서 갈라 보면
+ * "자동 확인"과 "아직 직접 확인이 필요해요"가 한 줄에 공존하는 #88이 다시 난다.
  */
 function PremiseRow({ premise, quotePending }: { premise: Premise; quotePending: boolean }) {
-  const pending = quotePending && isAutoCheck(premise.checkType);
+  const { badge, body } = premiseDisplay(premise, quotePending);
   return (
     <div className="flex flex-col gap-1 rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-medium">{premise.statement}</span>
-        <Badge variant={isAutoCheck(premise.checkType) ? "secondary" : "outline"}>
-          {isAutoCheck(premise.checkType) ? "자동 확인" : "직접 확인 필요"}
+        <Badge variant={badge === "auto" ? "secondary" : "outline"}>
+          {badge === "auto" ? "자동 확인" : "직접 확인 필요"}
         </Badge>
       </div>
-      {pending ? (
+      {body.kind === "waiting" ? (
         <Skeleton className="h-4 w-2/3" />
-      ) : premise.status === "broken" ? (
-        <p className="text-xs text-destructive">
-          담으실 때 보신 것과 달라진 게 있어요 — {premise.statement}, 지금은 {premise.observedValue}
-        </p>
-      ) : premise.status === "manual" || premise.status === "pending" ? (
-        <p className="text-xs text-muted-foreground">{premise.manualNote ?? "아직 직접 확인이 필요해요."}</p>
-      ) : premise.status === "awaiting" ? (
-        // 도달 목표는 조용히 둔다 — 미도달은 생각이 틀어진 게 아니라 진행 중인 것이라
-        // `broken`처럼 눈에 띄어서는 안 된다 (#85).
-        <p className="text-xs text-muted-foreground">아직 도달하지 않았어요 — 지금은 {premise.observedValue}</p>
-      ) : premise.status === "reached" ? (
-        <p className="text-xs text-muted-foreground">생각하신 가격에 닿았어요 — 지금은 {premise.observedValue}</p>
-      ) : premise.observedValue ? (
-        <p className="text-xs text-muted-foreground">현재 {premise.observedValue}</p>
+      ) : body.kind === "alert" ? (
+        <p className="text-xs text-destructive">{body.text}</p>
+      ) : body.kind === "note" ? (
+        <p className="text-xs text-muted-foreground">{body.text}</p>
       ) : null}
     </div>
   );
