@@ -279,7 +279,7 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
             줄이고, 강조는 앰버가 맡는다. `default`(36px)도 `lg`(48px)도 아닌 크기라
             사이즈 토큰을 늘리는 대신 이 한 곳에서만 덮는다. */}
         <Button
-          className="h-10 self-start px-5"
+          className="h-10 self-center px-5"
           onClick={handleUpdateThesis}
         >
           {updateThesisLabel}
