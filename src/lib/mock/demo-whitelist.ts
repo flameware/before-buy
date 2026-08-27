@@ -1,10 +1,18 @@
 import type { Stock } from "./types";
 
 /**
- * 검색(S1.5) 대상 종목 전체. issue #10 리서치(docs 브랜치 `research/demo-whitelist`,
- * 아직 미병합)의 26종 후보를 그대로 옮김 — 실 API 연동 전이라 시세는 fixture 값.
+ * **데모 화이트리스트** — 손으로 고른 27종 (CONTEXT.md). issue #10 리서치
+ * (`docs/research/demo-whitelist.md`)의 26종 후보에서 출발했다.
+ *
+ * **검색 범위가 아니다.** 검색(S1.5)은 KIS 종목 마스터가 주는 상장 종목 전체를 본다
+ * (`lib/kis/stock-master.ts`, ADR-0008). 여기 남는 것은 손으로 고른 값이 필요한 셋뿐이다:
+ * 시드 종목, S1.5 "인기 종목", 그리고 큐레이션된 업종 라벨.
+ *
+ * 이 파일이 `stock-universe.ts`에서 갈라져 나온 이유(#92): 하나의 상수가 "앱이 아는 종목"과
+ * "데모용으로 고른 종목" 두 역할을 겸하고 있었다. 그 상태로는 인기 종목 5개를 뽑는 데
+ * 상장 종목 2,600종을 훑는 코드가 아무 저항 없이 통과한다.
  */
-export const STOCK_UNIVERSE: Stock[] = [
+export const DEMO_WHITELIST: Stock[] = [
   { ticker: "005930", name: "삼성전자", sector: "반도체/전자", exchange: "KOSPI" },
   { ticker: "000660", name: "SK하이닉스", sector: "반도체", exchange: "KOSPI" },
   { ticker: "005380", name: "현대자동차", sector: "자동차", exchange: "KOSPI" },
@@ -34,48 +42,20 @@ export const STOCK_UNIVERSE: Stock[] = [
   { ticker: "377300", name: "카카오페이", sector: "핀테크/결제", exchange: "KOSPI" },
 ];
 
-/** S1.5 "인기 종목" 5개 — 화이트리스트에서 고정 선정. */
+/** S1.5 "인기 종목" 5개 — 데모 화이트리스트에서 고정 선정. */
 export const POPULAR_TICKERS = ["005930", "000660", "035420", "005380", "373220"];
 
-export function findStock(ticker: string): Stock | undefined {
-  return STOCK_UNIVERSE.find((s) => s.ticker === ticker);
+/**
+ * 데모 화이트리스트에서 1건을 찾는다. **여기 없다고 해서 상장되지 않은 종목이 아니다** —
+ * 화이트리스트 밖 종목의 이름은 `findListedStock`(종목 마스터)이 안다.
+ *
+ * 시드 프로비저닝처럼 "손으로 고른 27종만 다루는" 자리에서만 쓴다.
+ */
+export function findDemoStock(ticker: string): Stock | undefined {
+  return DEMO_WHITELIST.find((s) => s.ticker === ticker);
 }
 
-export function searchStocks(query: string): Stock[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
-  return STOCK_UNIVERSE.filter(
-    (s) => s.name.toLowerCase().includes(q) || s.ticker.includes(q),
-  );
+/** S1.5 "인기 종목" 목록. 화이트리스트에서 뽑으므로 큐레이션된 업종 라벨이 붙어 있다. */
+export function popularStocks(): Stock[] {
+  return POPULAR_TICKERS.map(findDemoStock).filter((s): s is Stock => s !== undefined);
 }
-
-/** 검색 결과에 시세를 붙일 때 쓰는 정적 fixture 가격 (실 API 연동 전). */
-export const STATIC_QUOTES: Record<string, { price: number; changePercent: number }> = {
-  "005930": { price: 84200, changePercent: 0.6 },
-  "000660": { price: 212500, changePercent: -1.2 },
-  "005380": { price: 241000, changePercent: 0.3 },
-  "012330": { price: 268500, changePercent: -0.4 },
-  "105560": { price: 92300, changePercent: 1.1 },
-  "000810": { price: 385000, changePercent: 0.2 },
-  "006800": { price: 12850, changePercent: -0.8 },
-  "004170": { price: 178000, changePercent: 0.1 },
-  "017670": { price: 42000, changePercent: -0.5 },
-  "035420": { price: 218500, changePercent: 1.4 },
-  "207940": { price: 1042000, changePercent: 0.7 },
-  "005490": { price: 412000, changePercent: 2.1 },
-  "010950": { price: 68900, changePercent: -0.3 },
-  "352820": { price: 231000, changePercent: 1.8 },
-  "004370": { price: 412500, changePercent: 0.2 },
-  "028260": { price: 118000, changePercent: -0.6 },
-  "011200": { price: 19850, changePercent: 3.2 },
-  "373220": { price: 385000, changePercent: -1.1 },
-  "012450": { price: 812000, changePercent: 2.6 },
-  "051910": { price: 298000, changePercent: -0.9 },
-  "003490": { price: 24950, changePercent: 0.4 },
-  "090430": { price: 210000, changePercent: -1.5 },
-  "329180": { price: 512000, changePercent: 1.9 },
-  "066570": { price: 98500, changePercent: 0.5 },
-  "293490": { price: 21400, changePercent: -2.3 },
-  "383220": { price: 42800, changePercent: 0.8 },
-  "377300": { price: 46300, changePercent: 0.4 },
-};

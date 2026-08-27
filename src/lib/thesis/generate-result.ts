@@ -9,7 +9,7 @@ import { withSession } from "@/lib/db/session";
 import { getKoreanStockPrices } from "@/lib/kis/batch-quote";
 import { generateCritiqueAndPremises } from "@/lib/llm/critique";
 import { LLMCallLimitExceededError, LLMError, type CritiqueOutput } from "@/lib/llm/types";
-import { findStock } from "@/lib/mock/stock-universe";
+import { resolveStock } from "@/lib/stock/resolve-stock";
 import type { QuoteSnapshot, ThesisCategory, FollowupAnswer } from "@/lib/mock/types";
 import { buildFollowupSummary } from "./followup-summary";
 
@@ -28,8 +28,9 @@ export async function generateThesisResult(
   draft: ThesisDraftInput
 ): Promise<GenerateThesisResultOutcome> {
   return withSession(async (sessionId) => {
-    const stock = findStock(ticker);
-    if (!stock) throw new Error(`Unknown ticker: ${ticker}`);
+    // 던지지 않는다 — 이름을 모르는 것과 종목이 없는 것은 다르다. 존재하지 않는
+    // 티커는 바로 아래 KIS 시세 조회가 `quote-unavailable`로 걸러낸다 (#92).
+    const stock = await resolveStock(ticker);
 
     const results = await getKoreanStockPrices([ticker]);
     const result = results.get(ticker);

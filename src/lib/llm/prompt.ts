@@ -125,8 +125,16 @@ function buildFollowupSection(summary: string): string {
   return summary.trim() || "(답변 없음)";
 }
 
+/**
+ * 업종은 데모 화이트리스트 27종에만 있다(ADR-0008). 없을 때 `(undefined)`나 `(기타)`를
+ * 남기면 모델이 그것을 사실로 읽으므로, 괄호째 뺀다 — 모르는 것은 말하지 않는다 (#92).
+ */
+function stockLine(stockName: string, sector?: string): string {
+  return sector ? `${stockName} (${sector})` : stockName;
+}
+
 export function buildUserMessage(input: CritiqueInput): string {
-  return `종목: ${input.stockName} (${input.sector})
+  return `종목: ${stockLine(input.stockName, input.sector)}
 카테고리: ${input.category}
 
 후속 질문 답변:

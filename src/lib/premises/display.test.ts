@@ -64,7 +64,8 @@ describe("premiseDisplay — 본문", () => {
   });
 
   it("설정을 읽지 못하면 이유를 밝히고 고칠 방법을 알려준다", () => {
-    expect(premiseDisplay(premise({ status: "unreadable" }), false).body).toEqual({
+    const unreadableConfig = premise({ status: "unreadable", checkConfig: {} });
+    expect(premiseDisplay(unreadableConfig, false).body).toEqual({
       kind: "note",
       text: "이 조건을 시스템이 읽지 못해요 — 근거를 다시 써주세요.",
     });
@@ -73,10 +74,38 @@ describe("premiseDisplay — 본문", () => {
   // 읽지 못한다는 사실은 시세와 무관하게 확정이다. 스켈레톤 뒤에 숨기면 배지는 이미
   // "직접 확인 필요"인데 문구만 로딩 중인 한 박자가 생긴다.
   it("설정을 읽지 못하면 시세를 기다리는 중에도 그 사실을 바로 말한다", () => {
-    expect(premiseDisplay(premise({ status: "unreadable" }), true).body).toEqual({
+    const unreadableConfig = premise({ status: "unreadable", checkConfig: {} });
+    expect(premiseDisplay(unreadableConfig, true).body).toEqual({
       kind: "note",
       text: "이 조건을 시스템이 읽지 못해요 — 근거를 다시 써주세요.",
     });
+  });
+
+  // 같은 `unreadable`이라도 원인이 시세 쪽이면 안내가 달라야 한다 (#92). 설정은 멀쩡한데
+  // KIS가 PER을 주지 않는 종목에 "근거를 다시 써주세요"라고 하면, 사용자는 다시 써도
+  // 똑같은 결과를 받으러 갔다 온다.
+  it("설정은 멀쩡한데 지표가 없으면 근거를 다시 쓰라고 하지 않는다", () => {
+    const noMetric = premise({
+      checkType: "valuation",
+      checkConfig: { kind: "value-ceiling", metric: "per", value: 15 },
+      status: "unreadable",
+    });
+    expect(premiseDisplay(noMetric, false).body).toEqual({
+      kind: "note",
+      text: "이 종목은 이 지표가 제공되지 않아 직접 확인이 필요해요.",
+    });
+  });
+
+  // 문구는 갈려도 배지는 갈리지 않는다 — 어느 쪽이든 판정은 시스템 손을 떠났다 (#88).
+  it("원인이 무엇이든 unreadable은 자동 확인을 주장하지 않는다", () => {
+    const byConfig = premise({ status: "unreadable", checkConfig: {} });
+    const byQuote = premise({
+      checkType: "valuation",
+      checkConfig: { kind: "value-ceiling", metric: "per", value: 15 },
+      status: "unreadable",
+    });
+    expect(premiseDisplay(byConfig, false).badge).toBe("manual");
+    expect(premiseDisplay(byQuote, false).badge).toBe("manual");
   });
 
   // 도달 목표는 조용히 둔다 (#85) — 미도달은 생각이 틀어진 게 아니라 진행 중인 것이다.

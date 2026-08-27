@@ -1,11 +1,8 @@
-import { findStock, STATIC_QUOTES } from "./stock-universe";
-import { resolveSeedItems, resolveSeedQuote } from "./seed-data";
-import { getUserWatchlistItems, isWatchlistItemRemoved } from "./user-watchlist";
-import type { BadgeState, QuoteSnapshot, Stock, WatchlistItem } from "./types";
+import type { BadgeState, WatchlistItem } from "./types";
 
 export * from "./types";
 export * from "./categories";
-export { STOCK_UNIVERSE, POPULAR_TICKERS, findStock, searchStocks } from "./stock-universe";
+export { DEMO_WHITELIST, POPULAR_TICKERS, findDemoStock, popularStocks } from "./demo-whitelist";
 export { setThesisDraft, getThesisDraft, type ThesisDraft } from "./thesis-draft";
 export { addUserWatchlistItem, removeWatchlistItem } from "./user-watchlist";
 export { generateCritique, generatePremises } from "./critique";
@@ -26,33 +23,6 @@ export function badgeLabel(state: BadgeState): string {
     case "changed":
       return "달라짐";
   }
-}
-
-/** 시드 종목이면 시나리오별 시세를, 사용자가 담은 종목이면 정적 fixture 시세를 반환. */
-export function quoteFor(item: Pick<WatchlistItem, "ticker" | "isSeed">, isFuture: boolean): QuoteSnapshot {
-  if (item.isSeed) {
-    const seedQuote = resolveSeedQuote(item.ticker, isFuture);
-    if (seedQuote) return seedQuote;
-  }
-  return STATIC_QUOTES[item.ticker] ?? { price: 0, changePercent: 0 };
-}
-
-export function stockFor(item: Pick<WatchlistItem, "ticker">): Stock {
-  const stock = findStock(item.ticker);
-  if (!stock) throw new Error(`Unknown ticker in mock data: ${item.ticker}`);
-  return stock;
-}
-
-/**
- * 인메모리 관심종목 목록. 시드 5종에 세션 중 사용자가 담은 종목(user-watchlist.ts)이
- * 이어붙는다 — 새로고침 시 시드만 남는 건 의도된 동작
- * (Notes: "S2에서 담은 종목은 새로고침 시 휘발되어도 무방").
- */
-export function initialWatchlist(isFuture: boolean): WatchlistItem[] {
-  return [
-    ...resolveSeedItems(isFuture).filter((item) => !isWatchlistItemRemoved(item.id)),
-    ...getUserWatchlistItems(),
-  ];
 }
 
 export function splitByStatus<T extends WatchlistItem>(items: T[]) {
