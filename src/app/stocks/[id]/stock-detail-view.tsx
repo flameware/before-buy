@@ -25,7 +25,6 @@ import { composeView } from "@/lib/watchlist/compose-view";
 import { returnSinceAdded, returnSinceBuy } from "@/lib/watchlist/returns";
 import { premiseDisplay } from "@/lib/premises/display";
 import { getCategory, type FollowupAnswer, type Premise } from "@/lib/mock";
-import type { DemoScenario } from "@/lib/mock/types";
 import { removeWatchlistItemAction } from "@/app/actions";
 import { applyWatchlistRemoved, WATCHLIST_LIST_KEY } from "@/lib/watchlist/cache";
 
@@ -66,13 +65,15 @@ function followupSummary(category: Parameters<typeof getCategory>[0], followup: 
 }
 
 /**
- * 가격 흐름 표의 한 행. **행이 곧 시점이다** — 담은 날 / 매수 / 현재.
+ * 가격 흐름 표의 한 행. **행이 곧 시점이다** — 담은 날 / 매수 / 오늘.
  *
  * 3열(라벨 · 날짜 · 값)로 세우는 이유는 값이 오른쪽 한 축에 꽂히게 하기 위해서다. 예전에는
  * `담은 날 172,000원 (6/18) → 현재 186,500원 +8.4%` 한 줄이었는데, 라벨·날짜·가격이 뒤섞여
  * 세로 스캔선이 없었다 — 두 값을 비교하려면 매번 문장을 읽어야 했다(#127). 날짜를 라벨에
  * 붙이지 않고 제 열에 두는 것도 같은 이유다: 라벨 길이가 달라도(`담은 날` 3자, `매수` 2자)
  * 날짜가 세로로 맞는다.
+ *
+ * `when`은 없을 수 있다 — `오늘` 행이 그렇다. 이유는 `PriceFlowSection`에 적어둔다.
  *
  * 행은 `<Fragment>`로 셀 셋을 흘려보낸다 — 행마다 `div`로 감싸면 그리드가 열을 못 맞춘다.
  */
@@ -83,7 +84,7 @@ function PriceFlowRow({
   emphasis = false,
 }: {
   label: string;
-  when: string;
+  when?: string;
   children: ReactNode;
   emphasis?: boolean;
 }) {
@@ -103,7 +104,7 @@ function PriceFlowRow({
  *
  * **시세가 없어도 행은 사라지지 않는다.** 예전에는 값이 없으면 줄을 통째로 지웠고, 시세가
  * 도착하는 순간 카드 높이가 튀었다. 조회 중이면 스켈레톤, 기준이 없으면 `-`로 자리를 지킨다 —
- * `현재` 행 가격 칸과 같은 규율이고, CONTEXT.md `시세 상태`가 말하는 "결판나기 전에 결판난
+ * `오늘` 행 가격 칸과 같은 규율이고, CONTEXT.md `시세 상태`가 말하는 "결판나기 전에 결판난
  * 것처럼 말하지 않는다"의 같은 얼굴이다.
  *
  * `null`은 **기준 가격이 없다**는 뜻이라 `-`로 말한다 — 0%로 접으면 "안 변했다"가 된다.
@@ -115,7 +116,7 @@ function DerivedValue({ pending, value }: { pending: boolean; value: number | nu
 }
 
 /**
- * S5 상단 **가격 흐름**. 담은 날 → (매수) → 현재라는 시간축을 표로 세우고, 점선 아래에
+ * S5 상단 **가격 흐름**. 담은 날 → (매수) → 오늘이라는 시간축을 표로 세우고, 점선 아래에
  * 그 값들로 계산해낸 것을 둔다.
  *
  * 점선인 이유: 근거 카드가 쓰는 실선과 **다른 종류의 경계**다. 칸막이가 아니라 "위는 관측된
@@ -124,7 +125,7 @@ function DerivedValue({ pending, value }: { pending: boolean; value: number | nu
  *
  * 보유중의 `담은 날 대비`·`손익`을 한 줄에 나란히 두지 않는 것은 의도된 것이다 — 한 줄에
  * 넣으면 앞쪽 퍼센트가 오른쪽 정렬선 밖으로 벗어나 이 표의 이점이 깨진다. 두 행으로 세우면
- * 위에서 아래로 `담은 날 → 매수 → 현재 → 담은 날 대비 → 손익` 순이 되어, 두 파생값이 어느
+ * 위에서 아래로 `담은 날 → 매수 → 오늘 → 담은 날 대비 → 손익` 순이 되어, 두 파생값이 어느
  * 행에서 왔는지가 순서만으로 드러난다. 그래서 `손익`은 `매수 대비`로 개명하지 않는다:
  * `담은 날 대비`는 생각이 아직 맞나를 재는 진단값이고 `손익`은 번 돈과 잃은 돈이라는 사실이라,
  * 이름을 맞추면 둘이 같은 종류의 퍼센트 두 개로 납작해진다.
@@ -136,7 +137,6 @@ function PriceFlowSection({
   quotePending,
   sinceAdded,
   sinceBuy,
-  scenario,
 }: {
   item: ReturnType<typeof composeView>;
   isBought: boolean;
@@ -144,13 +144,7 @@ function PriceFlowSection({
   quotePending: boolean;
   sinceAdded: number | null;
   sinceBuy: number | null;
-  scenario: DemoScenario;
 }) {
-  // `현재` 행의 날짜 칸에는 날짜를 쓰지 않는다. `담은 날 8/3` 옆에 `현재 8/28`이 서면 둘이
-  // 같은 종류의 값으로 보이는데, 위 두 행은 **박제된 사실**이고 이 행은 **지금 움직이는 값**이다.
-  // 데모 시점이 `3개월 후`면 "현재"가 오늘이 아니므로 그렇게 말한다.
-  const nowLabel = scenario === "future" ? "3개월 후" : "오늘";
-
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-sm font-semibold text-muted-foreground">가격 흐름</h2>
@@ -165,7 +159,16 @@ function PriceFlowSection({
           </PriceFlowRow>
         ) : null}
 
-        <PriceFlowRow label="현재" when={nowLabel} emphasis>
+        {/* 라벨은 `오늘`이고 날짜 칸은 **비운다**. `현재 | 오늘`은 두 칸이 같은 말을 두 번 해
+            이 표의 이점인 세로 스캔선 하나를 낭비했고, `현재`는 이미 데모 시점의 값 이름이다.
+            날짜를 채우지 않는 이유는 **데모에 시계가 없다**는 것이다 — `3개월 후`는 시세 변종일
+            뿐(`seed-data.ts`) `addedAt`은 그대로라, 그 모드의 '오늘'에 해당하는 날짜가 존재하지
+            않는다. 없는 값을 지어내느니 칸을 비운다.
+
+            `3개월 후` 모드에서도 이 행은 `오늘`이라고 말한다. 시뮬레이션은 앱 전체가 하는 것이고
+            홈 헤더가 배너로 이미 선언한다 — 행마다 `3개월 후`를 붙이면 서비스 화면이 자기가
+            데모라는 것을 매번 실토하는 꼴이 된다. */}
+        <PriceFlowRow label="오늘" emphasis>
           {quotePending ? (
             <Skeleton className="ml-auto h-5 w-24" />
           ) : snapshot ? (
@@ -318,7 +321,6 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
           quotePending={quotePending}
           sinceAdded={sinceAdded}
           sinceBuy={sinceBuy}
-          scenario={scenario}
         />
 
         <section className="flex flex-col gap-2">
