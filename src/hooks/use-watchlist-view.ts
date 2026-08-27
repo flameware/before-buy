@@ -9,6 +9,7 @@ import {
 } from "@/app/actions";
 import type { DemoScenario } from "@/lib/mock/types";
 import { QUOTE_FAILED, QUOTE_LOADING, settledQuote, type QuoteState } from "@/lib/quote/quote-state";
+import { withTimeout } from "@/lib/query/with-timeout";
 import {
   quotesKey,
   toTickerKey,
@@ -21,6 +22,32 @@ import type { SettledWatchlistItem, WatchlistListItem } from "@/lib/watchlist/ge
 /** ADR-0002: 목록은 60초, 시세는 20초 — 재방문 시 캐시가 신선하면 즉시 렌더하고 조용히 갱신한다. */
 const LIST_STALE_TIME_MS = 60_000;
 const QUOTES_STALE_TIME_MS = 20_000;
+
+/**
+ * 시세 쿼리가 정착을 기다리는 한계 (#82). 서버 액션이 실패해도 클라이언트 promise가
+ * 깨지지 않는 경우가 있어(#83), 이 시간이 지나면 쿼리를 실패로 깨운다 — 그러면
+ * `quoteStateFor`의 `isError` 분기를 타 화면이 skeleton 대신 "시세 조회 실패"를 그린다.
+ *
+ * KIS 배치 조회의 정상 왕복보다 넉넉히 길게 잡았다. 느린 응답을 실패로 접는 것이
+ * 아니라 **오지 않는 응답**을 접는 장치다.
+ */
+const QUOTES_TIMEOUT_MS = 10_000;
+
+/**
+ * 두 호출부(S1 목록 / S4·S5 1건)가 같은 쿼리 키에 같은 `queryFn`과 같은 재시도 정책을
+ * 쓴다 — 한쪽만 방어하면 같은 캐시를 다른 규칙으로 채우게 된다.
+ *
+ * **재시도하지 않는다.** 기본값(`retry: 3`, 백오프 1·2·4초)이면 매 시도가 타임아웃까지
+ * 10초를 채워 쿼리가 `isError`에 닿기까지 ~47초가 걸린다 — 실측으로 확인했다. 그동안
+ * 화면은 여전히 skeleton이라 방어가 사실상 없는 것과 같다. 게다가 여기까지 온 실패는
+ * 이미 서버 쪽 `try/catch`(`loadWatchlistQuotes`)를 통과한 것들이라 한 번 더 부른다고
+ * 달라질 가능성이 낮고, `staleTime`이 20초라 다음 자연스러운 재검증이 곧 다시 시도한다.
+ */
+const QUOTES_QUERY_DEFAULTS = { staleTime: QUOTES_STALE_TIME_MS, retry: false } as const;
+
+function fetchQuotes(quoteTargets: { ticker: string; isSeed: boolean }[], scenario: DemoScenario) {
+  return withTimeout(loadWatchlistQuotes(quoteTargets, scenario), QUOTES_TIMEOUT_MS, "시세 조회");
+}
 
 /**
  * 시세 쿼리의 상태를 종목 하나의 시세 상태로 옮긴다. 실패는 두 경로로 온다 — 쿼리 전체
@@ -70,9 +97,9 @@ export function useWatchlistView(scenario: DemoScenario, hydrated: boolean) {
 
   const quotesQuery = useQuery({
     queryKey: quotesKey(scenario, tickerKey),
-    queryFn: () => loadWatchlistQuotes(quoteTargets, scenario),
+    queryFn: () => fetchQuotes(quoteTargets, scenario),
     enabled: hydrated && quoteTargets.length > 0,
-    staleTime: QUOTES_STALE_TIME_MS,
+    ...QUOTES_QUERY_DEFAULTS,
   });
 
   const quotesData = quotesQuery.data;
@@ -137,9 +164,9 @@ export function useWatchlistItemView(
   // 않는다. KIS 조회는 배치라 N종목이 1회 호출이므로 티커 하나만 따로 부를 이유도 없다.
   const quotesQuery = useQuery({
     queryKey: quotesKey(scenario, tickerKey),
-    queryFn: () => loadWatchlistQuotes(quoteTargets, scenario),
+    queryFn: () => fetchQuotes(quoteTargets, scenario),
     enabled: hydrated && cachedItem != null && quoteTargets.length > 0,
-    staleTime: QUOTES_STALE_TIME_MS,
+    ...QUOTES_QUERY_DEFAULTS,
     refetchOnMount: "always",
   });
 
