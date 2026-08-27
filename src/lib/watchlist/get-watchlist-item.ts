@@ -97,3 +97,29 @@ export async function removeWatchlistItem(ticker: string): Promise<void> {
       .where(and(eq(watchlistItems.sessionId, sessionId), eq(watchlistItems.ticker, ticker)));
   });
 }
+
+/**
+ * S2가 진입 시점에 묻는 것: 이 종목이 이미 세션의 관심종목인가? (#96)
+ *
+ * 시세도 근거도 붙이지 않는다 — 답이 필요한 곳은 "건너뛰기 버튼을 그릴까"뿐이고,
+ * 그 판정을 loadItem에 맡기면 화면에 쓰지도 않을 KIS 왕복을 S2 진입마다 태우게 된다.
+ * 클라이언트의 S1 목록 캐시로 대신하지 않는 이유는 정합성이다 — 직접 URL 진입이나
+ * 새로고침에는 그 캐시가 없고, 그러면 이미 담긴 종목에 건너뛰기가 뜨는 순간 근거 있는
+ * 카드 옆에 "근거 없음" 카드가 하나 더 생긴다.
+ */
+export async function isTickerWatched(ticker: string): Promise<boolean> {
+  return withSession(async (sessionId) => {
+    const [item] = await db
+      .select({ id: watchlistItems.id })
+      .from(watchlistItems)
+      .where(
+        and(
+          eq(watchlistItems.sessionId, sessionId),
+          eq(watchlistItems.ticker, ticker),
+          inArray(watchlistItems.status, ["watching", "bought"])
+        )
+      )
+      .limit(1);
+    return !!item;
+  });
+}
