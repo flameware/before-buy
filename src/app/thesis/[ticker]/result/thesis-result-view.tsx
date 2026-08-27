@@ -8,13 +8,10 @@ import { Button } from "@/components/ui/button";
 import { ScreenHeader } from "@/components/layout/screen-header";
 import { commitThesisAction, generateThesisResultAction, getExistingThesisAction } from "@/app/actions";
 import { getThesisDraft } from "@/lib/mock";
-import type { CheckType, QuoteSnapshot, Thesis } from "@/lib/mock/types";
+import { isAutoCheck } from "@/lib/premises/engine";
+import type { QuoteSnapshot, Thesis } from "@/lib/mock/types";
 import type { CritiqueOutput } from "@/lib/llm/types";
 import type { GenerateThesisResultOutcome } from "@/lib/thesis/generate-result";
-
-function isAutoCheck(checkType: CheckType): boolean {
-  return checkType === "price" || checkType === "valuation";
-}
 
 const LOADING_STAGE_MESSAGES = [
   "종목을 분석하고 있어요",

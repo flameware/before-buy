@@ -80,9 +80,21 @@ describe("resolvePremises — 도달 목표", () => {
     expect(p.observedValue).toBeUndefined();
   });
 
-  it("기준값이 없으면 시세가 있어도 판정하지 않는다", () => {
+  // #88: 기다리면 풀리는 자리(`pending`)와 그렇지 않은 자리(`unreadable`)를 갈라 둔다.
+  // 한 값에 담으면 화면이 영구 판정 불가에도 "잠시 기다리는 중"처럼 안내하게 된다.
+  it("기준값이 없으면 시세가 있어도 unreadable이다 — 기다려도 풀리지 않는다", () => {
     const [p] = resolvePremises([premise({ checkConfig: undefined, status: "intact" })], QUOTE);
-    expect(p.status).toBe("pending");
+    expect(p.status).toBe("unreadable");
+  });
+
+  it("방향(kind)을 잃은 예전 형식의 행은 unreadable이다", () => {
+    const [p] = resolvePremises([premise({ checkConfig: { value: 63_000 } })], QUOTE);
+    expect(p.status).toBe("unreadable");
+  });
+
+  it("설정을 읽을 수 없으면 시세를 기다리는 중에도 unreadable이다", () => {
+    const [p] = resolvePremises([premise({ checkConfig: undefined })], null);
+    expect(p.status).toBe("unreadable");
   });
 });
 
@@ -103,11 +115,13 @@ describe("resolvePremises — 유지 조건 (valuation)", () => {
     expect(p.observedValue).toBe("1.1배");
   });
 
-  it("metric이 없으면 판정하지 않는다", () => {
+  it("metric이 없으면 unreadable이다 — 어느 지표인지 모르면 시세를 기다려도 소용없다", () => {
     const [p] = resolvePremises([valuation({ kind: "value-ceiling", value: 15 })], QUOTE);
-    expect(p.status).toBe("pending");
+    expect(p.status).toBe("unreadable");
   });
 
+  // 여기는 전제가 아니라 시세 쪽이 비어 있다 — 근거를 다시 써도 풀리지 않으므로
+  // `unreadable`이 아니라 `pending`이다.
   it("시세에 해당 지표가 없으면 판정하지 않는다 — 시드가 아닌 종목은 PER/PBR이 비어 있다", () => {
     const [p] = resolvePremises(
       [valuation({ kind: "value-ceiling", metric: "per", value: 15 })],
@@ -188,7 +202,7 @@ describe("parseCheckConfig", () => {
     expect(parseCheckConfig({ kind: "floor", metric: "roe", value: "15" })).toBeUndefined();
   });
 
-  // 방향을 잃은 기준값은 판정할 수 없다. `resolvePremises`가 `pending`으로 떨어뜨려
+  // 방향을 잃은 기준값은 판정할 수 없다. `resolvePremises`가 `unreadable`로 떨어뜨려
   // 판정 불가를 드러내는 편이, 방향을 임의로 가정하는 것보다 낫다.
   it("kind가 없으면 남은 값만 살리고 방향은 비운다 — 예전 형식의 행", () => {
     expect(parseCheckConfig({ operator: "gte", value: 100 })).toEqual({

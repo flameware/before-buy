@@ -10,18 +10,27 @@ export type ThesisCategory =
 export type CheckType = "price" | "valuation" | "fundamental" | "qualitative";
 
 /**
- * 전제의 판정 결과. 앞의 넷은 **유지 조건**(지금 참이어야 하는 것)의 어휘이고, 뒤의 둘은
- * **도달 목표**(아직 오지 않은 기대)의 어휘다 — CONTEXT.md 참조.
+ * 전제의 판정 결과. `intact`/`broken`은 **유지 조건**(지금 참이어야 하는 것)의 어휘이고,
+ * `awaiting`/`reached`는 **도달 목표**(아직 오지 않은 기대)의 어휘다 — CONTEXT.md 참조.
  *
  * 도달 목표는 `intact`/`broken`을 쓰지 않는다. 미도달을 `intact`로 두면 "이 전제는
  * 유효하다"는 거짓말이 되고, `broken`으로 두면 아직 오지 않았을 뿐인 것이 "생각이 틀어졌다"로
  * 읽힌다. 어휘가 갈려 있으므로 **도달 목표는 배지에 투표할 수 없다** — `badgeState`가
  * `broken`만 세는 것으로 그 보장이 타입 수준에서 성립한다.
+ *
+ * 판정이 나오지 않은 경우는 둘로 갈린다. 성격이 다르기 때문이다 (#88).
+ * - `pending` — **시세를 기다리는 중**. 일시적이고, 시세가 오면 저절로 풀린다.
+ * - `unreadable` — **설정을 읽지 못함**. 시세는 있는데 `checkConfig`에서 기준이나 방향을
+ *   못 읽어 영구히 판정할 수 없다. 사용자가 근거를 다시 쓰기 전까지 풀리지 않는다.
+ *
+ * 둘을 한 값에 담으면 화면이 갈라 말할 수 없어, 영구 판정 불가에도 "잠시 기다리는 중"인
+ * 것처럼 안내하게 된다. `unreadable` 역시 `broken`이 아니므로 배지에 투표하지 않는다.
  */
 export type PremiseStatus =
   | "intact"
   | "broken"
   | "pending"
+  | "unreadable"
   | "manual"
   | "awaiting"
   | "reached";

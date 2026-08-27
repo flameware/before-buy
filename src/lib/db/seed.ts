@@ -17,7 +17,7 @@ import type { PremiseCheckConfig } from "../mock/types";
  * 임계값은 2026-08-26 KIS 실측가 × 1.05(반올림) 기준으로 잡았다 — issue #65.
  * 절대값 비교라 시세가 이 범위를 다시 넘으면 또 깨질 수 있다는 건 알고 감수한다.
  */
-const SEED_PREMISE_CHECK_CONFIG: Record<string, PremiseCheckConfig> = {
+export const SEED_PREMISE_CHECK_CONFIG: Record<string, PremiseCheckConfig> = {
   "seed-a-p1": { kind: "value-ceiling", value: 105_000 },
   "seed-b-p1": { kind: "value-ceiling", metric: "per", value: 44 },
   "seed-b-p2": { kind: "target-price", value: 210_000 },
