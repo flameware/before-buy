@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
 import { useWatchlistItemView } from "@/hooks/use-watchlist-view";
 import { composeView } from "@/lib/watchlist/compose-view";
+import { returnSinceAdded, returnSinceBuy } from "@/lib/watchlist/returns";
 import { premiseDisplay } from "@/lib/premises/display";
 import { getCategory, type FollowupAnswer, type Premise } from "@/lib/mock";
 import { removeWatchlistItemAction } from "@/app/actions";
@@ -117,11 +118,10 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
   const snapshot = quote.state === "ok" ? quote.snapshot : null;
   // 조회 중에는 가격도 전제 상태도 확정되지 않았다 — 실패 문구 대신 자리를 비워 기다린다.
   const quotePending = quote.state === "loading";
-  const returnSinceAdded = snapshot?.changePercent ?? 0;
-  const returnSinceBuy =
-    isBought && item.avgBuyPrice && snapshot
-      ? ((snapshot.price - item.avgBuyPrice) / item.avgBuyPrice) * 100
-      : 0;
+  // 두 기준을 여기서 계산하지 않는 이유는 `returns.ts` 머리말에 있다 (#86).
+  // `null`은 **기준 가격이 없다**는 뜻이다 — 0%로 접으면 안 된다.
+  const sinceAdded = snapshot ? returnSinceAdded(snapshot.price, item.addedPrice) : null;
+  const sinceBuy = isBought && snapshot ? returnSinceBuy(snapshot.price, item.avgBuyPrice) : null;
 
   function handleUpdateThesis() {
     router.push(`/thesis/${ticker}`);
@@ -162,10 +162,14 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
                   )}
                 </span>
               </div>
-              {snapshot ? (
+              {sinceAdded !== null || sinceBuy !== null ? (
                 <div className="flex items-center gap-3 text-xs">
-                  <span className={changeColor(returnSinceAdded)}>근거 대비 {formatChange(returnSinceAdded)}</span>
-                  <span className={changeColor(returnSinceBuy)}>손익 {formatChange(returnSinceBuy)}</span>
+                  {sinceAdded !== null ? (
+                    <span className={changeColor(sinceAdded)}>근거 대비 {formatChange(sinceAdded)}</span>
+                  ) : null}
+                  {sinceBuy !== null ? (
+                    <span className={changeColor(sinceBuy)}>손익 {formatChange(sinceBuy)}</span>
+                  ) : null}
                 </div>
               ) : null}
             </>
@@ -185,8 +189,8 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
                   "시세 조회 실패"
                 )}
               </span>
-              {snapshot ? (
-                <span className={`text-xs ${changeColor(returnSinceAdded)}`}>{formatChange(returnSinceAdded)}</span>
+              {sinceAdded !== null ? (
+                <span className={`text-xs ${changeColor(sinceAdded)}`}>{formatChange(sinceAdded)}</span>
               ) : null}
             </div>
           )}
