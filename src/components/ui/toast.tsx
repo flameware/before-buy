@@ -50,6 +50,8 @@ export function ToastViewport() {
             "transition-[opacity,transform] duration-300",
             "data-starting-style:translate-y-3 data-starting-style:opacity-0",
             "data-ending-style:translate-y-3 data-ending-style:opacity-0",
+            // limit을 넘긴 토스트는 제거되지 않고 `inert`로 남는다 — 가로로 늘어서지 않게 감춘다.
+            "data-limited:hidden",
           )}
         >
           <Toast.Title />

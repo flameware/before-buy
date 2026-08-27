@@ -204,9 +204,7 @@ export default function Home() {
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             {/* 이 뱃지가 가리키는 것은 값이 아니라 **토글이라는 장치 자체**라 On/Off와 무관하게
                 상시 노출한다 — 오해는 Off 상태에서 라벨만 보일 때 생긴다(#103). */}
-            <Badge variant="outline" className="font-normal text-muted-foreground">
-              데모용
-            </Badge>
+            <Badge variant="default">데모용</Badge>
             3개월 후 보기
             <Switch checked={hydrated && scenario === "future"} onCheckedChange={toggle} />
           </label>
