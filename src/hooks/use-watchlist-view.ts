@@ -82,7 +82,10 @@ export function useWatchlistView(scenario: DemoScenario, hydrated: boolean) {
     [listItems, quotesData, quotesError]
   );
 
-  return { items, isLoading: listQuery.isLoading };
+  // 하이드레이션 전에는 `enabled: false`라 `isLoading`이 `false`다(v5의 `isLoading`은
+  // `isPending && isFetching`). 그대로 넘기면 호출부는 "목록이 비었다"로 읽어 첫 프레임에
+  // 빈 상태 문구를 그린다 — 목록을 아직 모르는 것과 목록이 비어 있는 것은 다르다(#94).
+  return { items, isLoading: !hydrated || listQuery.isLoading };
 }
 
 export type ItemViewStatus = "loading" | "not-found" | "ready";
