@@ -49,7 +49,13 @@ function followupSummary(category: Parameters<typeof getCategory>[0], followup: 
   });
 }
 
-function PremiseRow({ premise }: { premise: Premise }) {
+/**
+ * `quotePending`이면 자동 확인 전제의 **상태 줄만** 가린다. "자동 확인 / 직접 확인 필요"
+ * 배지는 전제의 종류라 시세와 무관하게 늘 확정이고, 시세를 기다리는 동안 자동 전제는
+ * `pending`이라 "아직 직접 확인이 필요해요"라는 엉뚱한 안내가 나가기 때문이다.
+ */
+function PremiseRow({ premise, quotePending }: { premise: Premise; quotePending: boolean }) {
+  const pending = quotePending && isAutoCheck(premise.checkType);
   return (
     <div className="flex flex-col gap-1 rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
       <div className="flex items-center justify-between gap-3">
@@ -58,7 +64,9 @@ function PremiseRow({ premise }: { premise: Premise }) {
           {isAutoCheck(premise.checkType) ? "자동 확인" : "직접 확인 필요"}
         </Badge>
       </div>
-      {premise.status === "broken" ? (
+      {pending ? (
+        <Skeleton className="h-4 w-2/3" />
+      ) : premise.status === "broken" ? (
         <p className="text-xs text-destructive">
           담으실 때 보신 것과 달라진 게 있어요 — {premise.statement}, 지금은 {premise.observedValue}
         </p>
@@ -113,9 +121,14 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
 
   const item = composeView(listItem, quote);
   const isBought = item.status === "bought";
-  const returnSinceAdded = quote?.changePercent ?? 0;
+  const snapshot = quote.state === "ok" ? quote.snapshot : null;
+  // 조회 중에는 가격도 전제 상태도 확정되지 않았다 — 실패 문구 대신 자리를 비워 기다린다.
+  const quotePending = quote.state === "loading";
+  const returnSinceAdded = snapshot?.changePercent ?? 0;
   const returnSinceBuy =
-    isBought && item.avgBuyPrice && quote ? ((quote.price - item.avgBuyPrice) / item.avgBuyPrice) * 100 : 0;
+    isBought && item.avgBuyPrice && snapshot
+      ? ((snapshot.price - item.avgBuyPrice) / item.avgBuyPrice) * 100
+      : 0;
 
   function handleUpdateThesis() {
     router.push(`/thesis/${ticker}`);
@@ -146,10 +159,17 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
                 </span>
                 <span className="text-muted-foreground">→</span>
                 <span className="font-medium">
-                  현재 {quote ? formatPrice(quote.price) : "시세 조회 실패"}
+                  현재{" "}
+                  {quotePending ? (
+                    <Skeleton className="inline-block h-4 w-20 align-middle" />
+                  ) : snapshot ? (
+                    formatPrice(snapshot.price)
+                  ) : (
+                    "시세 조회 실패"
+                  )}
                 </span>
               </div>
-              {quote ? (
+              {snapshot ? (
                 <div className="flex items-center gap-3 text-xs">
                   <span className={changeColor(returnSinceAdded)}>근거 대비 {formatChange(returnSinceAdded)}</span>
                   <span className={changeColor(returnSinceBuy)}>손익 {formatChange(returnSinceBuy)}</span>
@@ -163,9 +183,16 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
               </span>
               <span className="text-muted-foreground">→</span>
               <span className="font-medium">
-                현재 {quote ? formatPrice(quote.price) : "시세 조회 실패"}
+                현재{" "}
+                {quotePending ? (
+                  <Skeleton className="inline-block h-4 w-20 align-middle" />
+                ) : snapshot ? (
+                  formatPrice(snapshot.price)
+                ) : (
+                  "시세 조회 실패"
+                )}
               </span>
-              {quote ? (
+              {snapshot ? (
                 <span className={`text-xs ${changeColor(returnSinceAdded)}`}>{formatChange(returnSinceAdded)}</span>
               ) : null}
             </div>
@@ -205,7 +232,7 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
             {item.thesis.premises.length > 0 ? (
               <div className="flex flex-col gap-2">
                 {item.thesis.premises.map((p) => (
-                  <PremiseRow key={p.id} premise={p} />
+                  <PremiseRow key={p.id} premise={p} quotePending={quotePending} />
                 ))}
               </div>
             ) : (

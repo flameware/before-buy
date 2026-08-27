@@ -9,7 +9,8 @@ import {
 } from "@/app/actions";
 import { resolvePremises } from "@/lib/premises/engine";
 import type { DemoScenario, QuoteSnapshot } from "@/lib/mock/types";
-import type { WatchlistListItem, WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
+import { QUOTE_FAILED, QUOTE_LOADING, settledQuote, snapshotOf, type QuoteState } from "@/lib/quote/quote-state";
+import type { SettledWatchlistItem, WatchlistListItem, WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
 
 /** ADR-0002: 목록은 60초, 시세는 20초 — 재방문 시 캐시가 신선하면 즉시 렌더하고 조용히 갱신한다. */
 const LIST_STALE_TIME_MS = 60_000;
@@ -36,15 +37,32 @@ function toTickerKey(items: { ticker: string }[]): string {
  */
 export function composeView(
   item: WatchlistListItem,
-  quote: QuoteSnapshot | null
+  quote: QuoteState
 ): WatchlistViewItem {
   return {
     ...item,
     quote,
     thesis: item.thesis
-      ? { ...item.thesis, premises: resolvePremises(item.thesis.premises, quote) }
+      ? { ...item.thesis, premises: resolvePremises(item.thesis.premises, snapshotOf(quote)) }
       : undefined,
   };
+}
+
+/**
+ * 시세 쿼리의 상태를 종목 하나의 시세 상태로 옮긴다. 실패는 두 경로로 온다 — 쿼리 전체
+ * reject와 응답 안에서 그 티커만 `null`인 경우(KIS 개별 조회 실패) — 둘 다 `failed`로
+ * 접는다. 사용자가 취할 행동이 같기 때문이다.
+ *
+ * `isFetching`이 아니라 "데이터가 아직 없음"만 `loading`으로 본다. 캐시된 값이 있는
+ * 재검증 중에는 이전 값을 그대로 보여준다 — 캐시를 나눈 목적이 그것이다(ADR-0002).
+ */
+function quoteStateFor(
+  ticker: string,
+  data: Record<string, QuoteSnapshot | null> | undefined,
+  isError: boolean
+): QuoteState {
+  if (data) return settledQuote(data[ticker]);
+  return isError ? QUOTE_FAILED : QUOTE_LOADING;
 }
 
 /**
@@ -76,9 +94,11 @@ export function useWatchlistView(scenario: DemoScenario, hydrated: boolean) {
     staleTime: QUOTES_STALE_TIME_MS,
   });
 
+  const quotesData = quotesQuery.data;
+  const quotesError = quotesQuery.isError;
   const items = useMemo(
-    () => listItems.map((item) => composeView(item, quotesQuery.data?.[item.ticker] ?? null)),
-    [listItems, quotesQuery.data]
+    () => listItems.map((item) => composeView(item, quoteStateFor(item.ticker, quotesData, quotesError))),
+    [listItems, quotesData, quotesError]
   );
 
   return { items, isLoading: listQuery.isLoading };
@@ -137,7 +157,7 @@ export function useWatchlistItemView(
 
   // 콜드 경로: 목록 캐시에 없는 종목. 합성된 1건을 받아 목록/시세로 되쪼갠다.
   const [cold, setCold] = useState<
-    { status: "loading" } | { status: "not-found" } | { status: "ready"; item: WatchlistViewItem }
+    { status: "loading" } | { status: "not-found" } | { status: "ready"; item: SettledWatchlistItem }
   >({ status: "loading" });
   const coldStartedRef = useRef(false);
   const needsCold = hydrated && cachedItem == null;
@@ -154,7 +174,7 @@ export function useWatchlistItemView(
     return {
       status: "ready" as ItemViewStatus,
       listItem: cachedItem,
-      quote: quotesQuery.data?.[ticker] ?? null,
+      quote: quoteStateFor(ticker, quotesQuery.data, quotesQuery.isError),
       // 재검증이 끝나야 고정해도 되는 값이 된다.
       quoteSettled: !quotesQuery.isFetching,
     };
@@ -164,26 +184,28 @@ export function useWatchlistItemView(
     return {
       status: "loading" as ItemViewStatus,
       listItem: null,
-      quote: null,
+      quote: QUOTE_LOADING,
       quoteSettled: false,
     };
   }
 
   if (cold.status === "not-found") {
+    // 그릴 종목 자체가 없다. 시세 상태는 호출부가 보지 않지만 "결판났다"는 쪽에 맞춘다.
     return {
       status: "not-found" as ItemViewStatus,
       listItem: null,
-      quote: null,
+      quote: QUOTE_FAILED,
       quoteSettled: true,
     };
   }
 
-  // 콜드 경로 결과는 이미 조회 시점의 시세라 재검증할 것이 없다.
+  // 콜드 경로 결과는 이미 조회 시점의 시세라 재검증할 것이 없다 — 서버가 돌려준 `null`은
+  // 순수하게 조회 실패다.
   const { quote, ...listItem } = cold.item;
   return {
     status: "ready" as ItemViewStatus,
     listItem: listItem as WatchlistListItem,
-    quote,
+    quote: settledQuote(quote),
     quoteSettled: true,
   };
 }
