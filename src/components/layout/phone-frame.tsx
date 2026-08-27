@@ -38,8 +38,13 @@ export function PhoneFrame({
           "sm:h-[874px] sm:w-[402px] sm:rounded-[2.5rem] sm:border sm:border-border sm:shadow-xl",
         )}
       >
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
-        <PhoneFrameContext.Provider value={frameRef}>{modal}</PhoneFrameContext.Provider>
+        {/* Provider가 `children`까지 감싸는 이유: 화면 안에서 여는 오버레이(S5의 관심종목
+            해제 확인 AlertDialog 등)도 같은 이유로 프레임 안에 포탈해야 한다. modal 슬롯만
+            감싸두면 그런 다이얼로그가 데스크톱에서 402px 액자를 벗어나 화면 전체를 덮는다. */}
+        <PhoneFrameContext.Provider value={frameRef}>
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
+          {modal}
+        </PhoneFrameContext.Provider>
         {/* 프레임의 DOM 후손이라 데스크톱에서도 402px 액자 안 하단에 머문다. */}
         <ToastViewport />
       </div>

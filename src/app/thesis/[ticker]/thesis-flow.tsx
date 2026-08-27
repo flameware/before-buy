@@ -235,6 +235,7 @@ export function ThesisFlow({
               </button>
             ) : null}
             <Button
+              size="lg"
               className="w-full"
               disabled={!category || skipping}
               onClick={() => setStep(2)}
@@ -244,12 +245,12 @@ export function ThesisFlow({
           </div>
         ) : null}
         {step === 2 ? (
-          <Button className="w-full" disabled={!step2Complete} onClick={() => setStep(3)}>
+          <Button size="lg" className="w-full" disabled={!step2Complete} onClick={() => setStep(3)}>
             다음
           </Button>
         ) : null}
         {step === 3 ? (
-          <Button className="w-full" onClick={handleSubmit}>
+          <Button size="lg" className="w-full" onClick={handleSubmit}>
             이대로 담기
           </Button>
         ) : null}

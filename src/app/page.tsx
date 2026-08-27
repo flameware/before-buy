@@ -97,10 +97,12 @@ function StockCard({
             <span
               className={
                 "text-xs tabular-nums " +
+                // 등락 방향 색은 매매 방향 색(`trade-buy`/`trade-sell`)과 값이 같아도
+                // 뜻이 다르다 — 토큰이 갈려 있어야 한쪽 조정이 다른 쪽을 끌고 가지 않는다.
                 (quote.snapshot.changePercent > 0
-                  ? "text-red-500"
+                  ? "text-price-up"
                   : quote.snapshot.changePercent < 0
-                    ? "text-blue-500"
+                    ? "text-price-down"
                     : "text-muted-foreground")
               }
             >
@@ -119,7 +121,7 @@ function StockCard({
       </div>
       {item.status === "watching" ? (
         <Button
-          size="sm"
+          variant="buy"
           onClick={(e) => {
             e.stopPropagation();
             router.push(`/order/${item.ticker}`);
@@ -147,7 +149,7 @@ function StockCardSkeleton({ withBuyButton }: { withBuyButton: boolean }) {
         <Skeleton className="h-5 w-20" />
         <Skeleton className="h-4 w-10" />
       </div>
-      {withBuyButton ? <Skeleton className="h-8 w-14 rounded-md" /> : null}
+      {withBuyButton ? <Skeleton className="h-9 w-14 rounded-md" /> : null}
     </div>
   );
 }
@@ -245,7 +247,7 @@ export default function Home() {
             </p>
           )}
           <Link href="/search">
-            <Button variant="outline" className="w-full">
+            <Button variant="outline" size="lg" className="w-full">
               + 종목 추가
             </Button>
           </Link>

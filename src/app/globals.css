@@ -27,6 +27,12 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-trade-buy: var(--trade-buy);
+  --color-trade-buy-foreground: var(--trade-buy-foreground);
+  --color-trade-sell: var(--trade-sell);
+  --color-trade-sell-foreground: var(--trade-sell-foreground);
+  --color-price-up: var(--price-up);
+  --color-price-down: var(--price-down);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -62,6 +68,18 @@
   --accent: oklch(0.852 0.199 91.936);
   --accent-foreground: oklch(0.421 0.095 57.708);
   --destructive: oklch(0.577 0.245 27.325);
+
+  /* 매매 방향(구매/판매)과 등락 방향(상승/하락)은 색이 같아도 **뜻이 다르다** — 값이 아니라
+     이름으로 갈라둔다. 한 토큰에 묶으면 "구매 버튼만 톤 다운"이 등락률 색까지 조용히 끌고 간다.
+     `--primary`(앰버)는 매매와 무관한 진행 CTA 전담이라 여기 섞지 않는다.
+     다크 모드는 이 프로토타입의 범위가 아니라 `.dark`에 대응 값을 두지 않는다 — 누락이 아니다. */
+  --trade-buy: #ff112d;
+  --trade-buy-foreground: #ffffff;
+  --trade-sell: #0090ff;
+  --trade-sell-foreground: #ffffff;
+  /* Tailwind의 red-500 / blue-500 — 지금까지 화면에 하드코딩돼 있던 값 그대로다. */
+  --price-up: oklch(63.7% 0.237 25.331);
+  --price-down: oklch(62.3% 0.214 259.815);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
