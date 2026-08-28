@@ -5,7 +5,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { ScreenHeader } from "@/components/layout/screen-header";
 import { addWithoutThesisAction } from "@/app/actions";
@@ -163,8 +162,26 @@ export function ThesisFlow({
   return (
     <>
       <ScreenHeader title={stockName} onBack={handleBack} />
-      <Progress value={(step / 3) * 100} className="px-4 pt-3" />
-      <p className="px-4 pt-1 text-xs text-muted-foreground">{step}/3</p>
+      {/* 화면명세 S2 "진행 표시": 칸 수가 단계 수를, 채운 칸 수가 현재 단계를 말한다. */}
+      <div
+        role="progressbar"
+        aria-label="근거 입력 진행"
+        aria-valuemin={1}
+        aria-valuemax={3}
+        aria-valuenow={step}
+        className="flex gap-1.5 px-4 pt-3"
+      >
+        {[1, 2, 3].map((s) => (
+          <div
+            key={s}
+            aria-hidden
+            className={
+              "h-1.5 flex-1 rounded-4xl transition-colors " +
+              (s <= step ? "bg-primary" : "bg-muted")
+            }
+          />
+        ))}
+      </div>
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
         {step === 1 ? (
           <>
