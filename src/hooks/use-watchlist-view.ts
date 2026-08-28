@@ -9,6 +9,7 @@ import {
 } from "@/app/actions";
 import type { DemoScenario } from "@/lib/mock/types";
 import { QUOTE_FAILED, QUOTE_LOADING, settledQuote, type QuoteState } from "@/lib/quote/quote-state";
+import { INITIAL_FETCH_PHASE, nextFetchPhase, type FetchPhase } from "@/lib/query/fetch-phase";
 import { withTimeout } from "@/lib/query/with-timeout";
 import {
   quotesKey,
@@ -143,6 +144,11 @@ export type ItemViewStatus = "loading" | "not-found" | "ready";
  * 않으므로, 재검증하지 않으면 캐시된 시세가 20초가 아니라 S1을 열어둔 시간만큼
  * 오래될 수 있다. 반환하는 `quoteSettled`가 그 재검증이 끝났는지를 알려준다 —
  * S4는 이 값을 `useFrozen`에 넘겨 재검증된 시세에 고정한다(ADR-0005).
+ *
+ * `quoteSettled`는 `!isFetching`이 **아니다.** 조회가 아직 시작하지 않은 프레임에서도
+ * 그 값은 참이고, 그런 프레임의 손에는 이전 키의 캐시가 들려 있다 — S4가 직전 데모
+ * 시점의 시세에 영원히 고정되던 원인이다(#141). 시작해서 끝났는지를 `nextFetchPhase`가
+ * 전이로 판정한다.
  */
 export function useWatchlistItemView(
   ticker: string,
@@ -175,6 +181,12 @@ export function useWatchlistItemView(
     refetchOnMount: "always",
   });
 
+  // 렌더 중에 자기 상태를 조정하는 React의 표준 패턴 — `useFrozen`과 같은 이유다.
+  // 이펙트로 옮기면 재검증이 끝난 프레임에 아직 `idle`이라 고정이 한 박자 늦는다.
+  const [fetchPhase, setFetchPhase] = useState<FetchPhase>(INITIAL_FETCH_PHASE);
+  const nextPhase = nextFetchPhase(fetchPhase, quotesQuery.isFetching);
+  if (nextPhase !== fetchPhase) setFetchPhase(nextPhase);
+
   // 콜드 경로: 목록 캐시에 없는 종목. 합성된 1건을 받아 목록/시세로 되쪼갠다.
   const [cold, setCold] = useState<
     { status: "loading" } | { status: "not-found" } | { status: "ready"; item: SettledWatchlistItem }
@@ -195,8 +207,9 @@ export function useWatchlistItemView(
       status: "ready" as ItemViewStatus,
       listItem: cachedItem,
       quote: quoteStateFor(ticker, quotesQuery.data, quotesQuery.isError, quotesQuery.isFetching),
-      // 재검증이 끝나야 고정해도 되는 값이 된다.
-      quoteSettled: !quotesQuery.isFetching,
+      // 재검증이 끝나야 고정해도 되는 값이 된다. "조회 중이 아니다"로는 부족하다 —
+      // 아직 시작하지 않은 것도 조회 중이 아니다(#141).
+      quoteSettled: nextPhase === "settled",
     };
   }
 
