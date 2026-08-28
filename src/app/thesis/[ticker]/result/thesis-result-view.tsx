@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
 import { ThesisResultContent } from "./thesis-result-content";
 import { commitThesisAction, generateThesisResultAction, getExistingThesisAction } from "@/app/actions";
 import { applyWatchlistAdded, WATCHLIST_LIST_KEY } from "@/lib/watchlist/cache";
-import { getThesisDraft } from "@/lib/mock";
+import { clearThesisDraft, getThesisDraft, resolveThesisResultOnce } from "@/lib/mock";
 import { isAutoCheck } from "@/lib/premises/engine";
 import type { QuoteSnapshot, Thesis } from "@/lib/mock/types";
 import type { CritiqueOutput } from "@/lib/llm/types";
@@ -87,7 +87,6 @@ export function ThesisResultView({ ticker, stockName }: { ticker: string; stockN
   const queryClient = useQueryClient();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [committing, setCommitting] = useState(false);
-  const generatingRef = useRef(false);
   const loadingMessage = useLoadingStageMessage(state.status === "loading");
 
   async function load() {
@@ -101,11 +100,16 @@ export function ThesisResultView({ ticker, stockName }: { ticker: string; stockN
         return;
       }
 
-      const outcome: GenerateThesisResultOutcome = await generateThesisResultAction(ticker, {
-        category: draft.category,
-        followup: draft.followup,
-        freeText: draft.freeText,
-      });
+      // 유상 호출은 draft의 결과 자리를 통과해서만 나간다 — 재진입은 앞서 본 결과를
+      // (시세까지 그 시점 값 그대로) 되보여주고, 로딩 중 재진입은 먼저 뜬 호출을
+      // 기다린다 (#122).
+      const outcome: GenerateThesisResultOutcome = await resolveThesisResultOnce(ticker, () =>
+        generateThesisResultAction(ticker, {
+          category: draft.category,
+          followup: draft.followup,
+          freeText: draft.freeText,
+        })
+      );
 
       if (!outcome.ok) {
         setState({ status: "error", reason: outcome.reason });
@@ -126,11 +130,12 @@ export function ThesisResultView({ ticker, stockName }: { ticker: string; stockN
   }
 
   useEffect(() => {
-    // Server Action은 세션당 20회 상한이 있는 유상 LLM 호출을 태울 수 있으므로,
-    // React Strict Mode의 effect 이중 실행으로 같은 종목에 두 번 과금되지 않도록 막는다.
-    if (generatingRef.current) return;
-    generatingRef.current = true;
-    load();
+    // 이중 호출 가드는 `load()` 안의 결과 자리가 맡는다 — 컴포넌트 `ref`는 언마운트되면
+    // 리셋돼 Strict Mode의 effect 이중 실행만 막았고, 재진입은 그대로 통과했다 (#122).
+    // `load()`는 첫 `await` 전에 `setState`에 닿지 않는다 — 규칙이 async 경계 너머를
+    // 보지 못해 동기 호출로 읽을 뿐이다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticker]);
 
@@ -220,6 +225,10 @@ export function ThesisResultView({ ticker, stockName }: { ticker: string; stockN
     );
     // ADR-0010: 서버가 돌려준 행을 S1 캐시에 옮겨 담는다 — 무효화만 하면 S1이 언마운트
     // 상태라 refetch가 시작되지 않아, 홈에 도착한 뒤에야 두 번의 왕복이 시작됐다 (#107).
+    // 커밋에 성공했으므로 draft와 결과를 버린다 — 다시 담을 것이 없다. S1에서 뒤로 온
+    // S3는 이제 `getExistingThesisAction` fallback으로 떨어져 커밋된 근거를 공짜로 읽고,
+    // `이대로 담기`가 같은 근거를 한 겹 더 쌓는 일도 함께 막힌다 (#122).
+    clearThesisDraft(ticker);
     applyWatchlistAdded(queryClient, added);
     // 무효화는 남기되 배경 재검증으로 강등한다. 옮겨 담은 값이 조회 결과와 어긋나더라도
     // (드리프트) 다음 마운트에서 조용히 교정된다.
