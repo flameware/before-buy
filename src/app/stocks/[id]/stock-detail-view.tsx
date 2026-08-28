@@ -54,6 +54,17 @@ function formatDate(iso: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+/**
+ * 저장된 근거의 후속 질문 답을 화면용으로 편다.
+ *
+ * **같은 답 조립식이 `buildFollowupSummary`에도 한 벌 더 있다. 지금 둘이 같은 것은 우연이지
+ * 계약이 아니다** — 저쪽은 모델에게 가는 계약(형식이 `프롬프트 명세.md` 3장에 박혀 있다)이고
+ * 이쪽은 사람이 읽는 표시다. 청중이 다르니 갈릴 이유도 있다. DRY로 읽고 하나로 모으지 말 것 (#159).
+ *
+ * **`-` 폴백은 이쪽에서만 살아 있다.** 여기는 저장된 옛 근거를 그리므로, `categories.ts`의
+ * 선택지 값이 개명되면 그 답이 `-`로 뜬다. 프롬프트 쪽은 S2가 방금 만든 초안만 보기 때문에
+ * 그 가지에 닿지 않는다 — 두 사본은 같은 문자열을 만들지만 살아 있는 가지가 다르다.
+ */
 function followupSummary(category: Parameters<typeof getCategory>[0], followup: FollowupAnswer[]) {
   const def = getCategory(category);
   return followup.map((a) => {
