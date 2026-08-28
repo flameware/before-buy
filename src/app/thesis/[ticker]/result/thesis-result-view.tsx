@@ -270,7 +270,9 @@ export function ThesisResultView({ ticker, stockName }: { ticker: string; stockN
                보게 되므로, 두 화면이 어긋나면 같은 전제가 화면마다 다른 모양이 된다. */
             <div className="flex flex-col gap-5 rounded-2xl bg-card px-4 py-4 ring-1 ring-foreground/10">
               {thesis.premises.map((p) => (
-                <div key={p.id} className="flex items-center justify-between gap-3">
+                /* `items-start` — S5 `전제별 상태`와 같은 이유다. 두 줄로 넘어가는 전제
+                   문장에서 배지가 문장 첫 줄에 맞춰 선다. */
+                <div key={p.id} className="flex items-start justify-between gap-3">
                   <div className="flex flex-col gap-0.5">
                     <span className="text-sm font-medium">{p.statement}</span>
                     {p.manualNote ? (

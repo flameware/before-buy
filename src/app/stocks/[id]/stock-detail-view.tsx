@@ -218,7 +218,10 @@ function PremiseRow({ premise, quotePending }: { premise: Premise; quotePending:
   const { badge, body } = premiseDisplay(premise, quotePending);
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-3">
+      {/* `items-start` — 전제 문장은 두 줄로 넘어간다. 세로 중앙에 두면 배지가 둘째 줄
+          높이까지 내려와, 전제마다 배지의 y가 문장 길이에 따라 달라진다. 오른쪽 배지 열의
+          세로 스캔선이 그렇게 깨진다. 배지는 문장 첫 줄에 맞춰 선다. */}
+      <div className="flex items-start justify-between gap-3">
         <span className="text-sm font-medium">{premise.statement}</span>
         <Badge variant={badge === "auto" ? "secondary" : "outline"}>
           {badge === "auto" ? "자동 확인" : "직접 확인 필요"}
