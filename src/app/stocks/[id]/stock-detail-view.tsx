@@ -251,12 +251,25 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
   // ADR-0002의 기본값(조용한 재검증)이 그대로 맞다.
   const { status, listItem, quote } = useWatchlistItemView(ticker, scenario, hydrated);
 
+  /**
+   * `3개월 후`라는 사실을 말하는 곳이 S1뿐이라, 새로고침이나 링크로 이 화면에 바로 서면
+   * 시점을 모른 채 배지를 보게 된다 — 머무는 화면은 스스로 선언한다 (CONTEXT.md `데모 시점`, #134).
+   *
+   * 문구가 **앱의 상태**를 말하고 이 종목의 값이 가정값이라고는 말하지 않는 이유: `future`에서
+   * fixture 시세로 갈아타는 것은 시드 종목뿐이고 사용자가 담은 종목은 그대로 실시간이다
+   * (기술스펙 7장). "이 화면의 값은 가정값입니다"는 비시드 종목에서 거짓이 된다.
+   *
+   * 게이트는 홈 배너와 같이 **시점 값 하나**다 — `hydrated`를 함께 보지 않는다.
+   */
+  const demoNote = scenario === "future" ? "3개월 후 보기가 켜져 있어요" : undefined;
+
   if (status === "loading") {
     // 예전에는 여기서 헤더만 렌더해 본문이 통째로 비어 있었다.
     return (
       <>
         {/* 로딩 중에는 관심종목인지 보유중인지 아직 모른다 — 북마크를 그리지 않는다. */}
-        <ScreenHeader title={stockName} />
+        {/* 선언은 **로딩에도 선다.** 여기서 빠지면 본문 전환에서 헤더 높이가 뛴다 (#134). */}
+        <ScreenHeader title={stockName} subtitle={demoNote} />
         <div className="flex flex-1 flex-col gap-6 px-4 py-4">
           <Skeleton className="h-20 rounded-2xl" />
           <div className="flex flex-col gap-2">
@@ -337,7 +350,7 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
 
   return (
     <>
-      <ScreenHeader title={stockName} />
+      <ScreenHeader title={stockName} subtitle={demoNote} />
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
         <PriceFlowSection
           item={item}
