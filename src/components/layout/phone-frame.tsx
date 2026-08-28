@@ -53,6 +53,43 @@ export function PhoneFrame({
         {/* 프레임의 DOM 후손이라 데스크톱에서도 402px 액자 안 하단에 머문다. */}
         <ToastViewport />
       </div>
+      <PhoneQrPanel />
+    </div>
+  );
+}
+
+/**
+ * 데스크톱 여백에 상주하는 "휴대폰으로 열기" 안내판. 액자는 "이건 폰 화면이다"라고
+ * 말하지만 거기서 그치므로, 배포 주소를 담은 QR로 그 문장을 끝맺는다 (#147).
+ *
+ * 프레임의 후손이 아니라 **형제**여야 한다 — 프레임의 `[contain:layout]`이 하위
+ * `position:fixed`의 containing block이 되므로, 안에 두면 402px 액자에 갇힌다.
+ *
+ * 흐름에 두지 않고 `fixed`인 이유: 액자는 874px + `py-10`으로 이미 세로 954px을 쓴다.
+ * 노트북 뷰포트에서는 프레임 아래 여백이 0이라, 거기 놓인 안내는 스크롤해야 보인다.
+ *
+ * `md` 미만에서 숨기는 이유와 치수가 빡빡한 이유: 액자가 954px(874 + `py-10`)이라 데스크톱
+ * 세로에서 항상 스크롤바가 서고, 액자는 그걸 뺀 폭에서 중앙 정렬된다. 여백 한쪽은
+ * `(뷰포트 - 스크롤바 - 402) / 2`라 768px에서 175.5px뿐이다. 카드는 `128 + 12×2 + 테두리
+ * = 154px`, 오프셋 16px까지 170px — 5.5px 여유다. 패딩이나 오프셋을 키우면 `md`에서 액자를
+ * 파고든다. QR을 줄여 여유를 사는 대안은 357px 원본을 뭉개 스캔을 실패시킨다 — 스캔되라고
+ * 놓는 물건이라 그게 유일한 실패 모드다.
+ *
+ * 시트가 열려도 남는다: Drawer/AlertDialog 오버레이는 프레임 안으로 포탈되므로 이 노드를
+ * 덮지 않는다. 숨기려면 앱 상태를 프레임 밖으로 새게 하는 결합이 필요하다.
+ */
+function PhoneQrPanel() {
+  return (
+    <div className="fixed right-4 bottom-4 hidden rounded-md border border-border bg-background p-3 shadow-xl md:block">
+      {/* eslint-disable-next-line @next/next/no-img-element -- 로컬 SVG 한 장이라 최적화할 것이 없다 */}
+      <img
+        src="/qr.svg"
+        alt="사기 전에 모바일 주소 QR 코드 — before-buy-stock.vercel.app"
+        width={128}
+        height={128}
+        className="block size-32"
+      />
+      <p className="mt-2 text-center text-xs text-muted-foreground">휴대폰으로 열기</p>
     </div>
   );
 }
