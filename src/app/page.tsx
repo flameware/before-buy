@@ -70,9 +70,17 @@ function StockCard({
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") router.push(`/stocks/${item.ticker}`);
       }}
+      // 종목은 카드로 감싸지 않는다 — `--card`와 `--background`가 둘 다 순백이라 카드를
+      // 카드로 만들던 것은 링 하나뿐이었고, 그 링이 목록을 번잡하게 했다(#135). 행을 가르는
+      // 것은 이제 두께다: `py-4`로 두껍게 하고 행 사이 간격은 0이다. 여기서 `py-3`으로
+      // 되돌리면 안쪽 여백이 행 사이보다 커져 "한 행 안"이 "행 사이"보다 벌어져 보인다.
       className={
-        "flex w-full items-center gap-3 rounded-2xl bg-card px-4 py-3 text-left ring-1 transition-shadow " +
-        (highlighted ? "ring-2 ring-primary" : "ring-foreground/10")
+        "flex w-full items-center gap-3 px-4 py-4 text-left transition-colors " +
+        // 하이라이트가 링이 아니라 배경 틴트인 이유: 무테 목록에서 링만 뜨면 "이 행만
+        // 카드다"로 읽혀 방금 없앤 문법이 되살아난다. 틴트는 행 전체를 덮으므로 경계가
+        // 흐린 목록에서 **어디까지가 그 행인지를 하이라이트가 겸해서 알려준다**.
+        // `--primary`는 앰버라 흰 배경에서 저알파는 거의 안 보인다 — 5/10/15/20을 띄워놓고 고른 값.
+        (highlighted ? "bg-primary/10" : "")
       }
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -150,7 +158,7 @@ function StockCard({
  */
 function StockCardSkeleton({ withBuyButton }: { withBuyButton: boolean }) {
   return (
-    <div className="flex w-full items-center gap-3 rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
+    <div className="flex w-full items-center gap-3 px-4 py-4">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Skeleton className="h-5 w-28" />
         <Skeleton className="h-5 w-16 rounded-4xl" />
@@ -172,7 +180,7 @@ const BOUGHT_SKELETON_COUNT = 2;
 
 function SkeletonList({ count, withBuyButton }: { count: number; withBuyButton: boolean }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col">
       {Array.from({ length: count }, (_, i) => (
         <StockCardSkeleton key={i} withBuyButton={withBuyButton} />
       ))}
@@ -262,13 +270,17 @@ export default function Home() {
         ) : null}
       </ScreenHeaderShell>
 
-      <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
-        <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold text-muted-foreground">관심종목</h2>
+      {/* 좌우 여백은 여기가 아니라 행·소제목이 각자 갖는다 — 행이 화면 끝까지 닿아야
+          두께가 행의 경계를 말할 수 있다. 섹션 간격이 24px에서 32px로 벌어진 것은 행 사이가
+          붙었기 때문이다: 섹션 구분은 행 간격에 종속된 값이라 따로 고정하면 둘 중 하나가
+          반드시 잘못 보인다(#135). */}
+      <div className="flex flex-1 flex-col gap-8 overflow-y-auto py-4">
+        <section className="flex flex-col">
+          <h2 className="px-4 pb-2 text-sm font-semibold text-muted-foreground">관심종목</h2>
           {loading ? (
             <SkeletonList count={WATCHING_SKELETON_COUNT} withBuyButton />
           ) : watching.length > 0 ? (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col">
               {watching.map((item) => (
                 <StockCard
                   key={item.id}
@@ -278,14 +290,19 @@ export default function Home() {
               ))}
             </div>
           ) : (
-            <p className="rounded-2xl bg-muted px-4 py-6 text-center text-sm text-muted-foreground">
+            <p className="mx-4 rounded-2xl bg-muted px-4 py-6 text-center text-sm text-muted-foreground">
               관심 가는 종목을 담아보세요. 왜 담았는지 같이 적어두면 나중에 도움이 됩니다.
             </p>
           )}
-          <Link href="/search">
+          {/* 전체폭 outline 버튼이 아니라 **내용폭 앰버 필**이다 — S5 `생각 업데이트 하기`와
+              같은 타입(`stock-detail-view.tsx`). 무테 목록에서 이걸 텍스트로 두면 종목 이름들과
+              정렬선을 공유해 목록의 마지막 종목처럼 읽힌다. 색으로는 안 떼어지고, 목록 행과
+              **폭이 아예 다른 것**이 "이건 항목이 아니다"를 말한다(#135).
+              `default`(36px)도 `lg`(48px)도 아닌 크기라 사이즈 토큰을 늘리는 대신 덮는다. */}
+          <Link href="/search" className="mt-3 flex justify-center">
             {/* `+`는 문자가 아니라 아이콘이다. 규격을 S4 수량 조절 버튼과 맞춰
                 (`order-confirm-content.tsx`) 앱 안에서 `+`가 한 가지 모양이 되게 한다. */}
-            <Button variant="outline" size="lg" className="w-full">
+            <Button className="h-10 px-5">
               <Plus className="size-4" />
               종목 추가
             </Button>
@@ -293,12 +310,12 @@ export default function Home() {
         </section>
 
         {loading || bought.length > 0 ? (
-          <section className="flex flex-col gap-2">
-            <h2 className="text-sm font-semibold text-muted-foreground">보유중</h2>
+          <section className="flex flex-col">
+            <h2 className="px-4 pb-2 text-sm font-semibold text-muted-foreground">보유중</h2>
             {loading ? (
               <SkeletonList count={BOUGHT_SKELETON_COUNT} withBuyButton={false} />
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col">
                 {bought.map((item) => (
                   <StockCard key={item.id} item={item} />
                 ))}
