@@ -13,11 +13,11 @@ import type { Premise, PremiseCheckConfig, QuoteSnapshot, Thesis, WatchlistItem 
  * 사본이 낡는 것이 #88이 남긴 교훈이다.
  */
 export const SEED_PREMISE_CHECK_CONFIG: Record<string, PremiseCheckConfig> = {
-  "seed-a-p1": { kind: "value-ceiling", value: 105_000 },
-  "seed-b-p1": { kind: "value-ceiling", metric: "per", value: 44 },
+  "seed-a-p1": { kind: "value-ceiling", value: 110_000 },
+  "seed-b-p1": { kind: "value-ceiling", metric: "per", value: 55 },
   "seed-b-p2": { kind: "target-price", value: 210_000 },
-  "seed-d-p1": { kind: "value-ceiling", value: 275_000 },
-  "seed-e-p1": { kind: "value-ceiling", value: 48_500 },
+  "seed-d-p1": { kind: "value-ceiling", value: 285_000 },
+  "seed-e-p1": { kind: "value-ceiling", value: 52_000 },
 };
 
 /**
@@ -27,13 +27,37 @@ export const SEED_PREMISE_CHECK_CONFIG: Record<string, PremiseCheckConfig> = {
  *
  * price/valuation 전제의 자동 판정(engine.ts)은 현재 시점(isFuture=false)에는
  * 시드 종목도 실시간 KIS 시세를 baseline으로 쓴다 — 여기 적힌 "current" 값이
- * 아니라 위 `SEED_PREMISE_CHECK_CONFIG`의 임계값과 그 실시간 시세를 비교한다. 그래서 이 임계값들은 2026-08-26 KIS 실측가 기준으로 맞춰뒀다.
- * 절대값 비교라 시세가 계속 움직이면 다시 깨질 수 있다는 점은 감수한다
- * (issue #65).
+ * 아니라 위 `SEED_PREMISE_CHECK_CONFIG`의 임계값과 그 실시간 시세를 비교한다.
+ *
+ * **따라서 자동 확인(price/valuation) 전제의 `current` status/observedValue와
+ * `quote.current`는 현재 시점 화면에 뜨지 않는다.** 판정은 라이브 시세로 덮이고
+ * (`resolvePremises`), 시세도 라이브를 쓴다(`resolveQuotes` — `resolveSeedQuote`는
+ * isFuture일 때만 호출된다). 이 값들을 보고 "지금 42.1배, 유지 중이구나"로 읽으면
+ * 안 된다 — 실제로 그 착각 때문에 #152가 늦게 발견됐다. 직접 확인(qualitative/
+ * fundamental) 전제의 `current`는 반대로 그대로 살아 화면에 그려진다.
+ *
+ * 절대값 × 라이브 시세 조합이라 시세가 움직이면 임계값을 넘고, 그때마다 손으로 다시
+ * 올려왔다: PER 15배 → 44배(#66) → 55배(#152). 세 번째 추격이며 임시방편이다.
+ * 구조적 해결(프로비저닝 시점 실측의 배수로 임계값을 구워 넣기)은 #151에서 다룬다.
+ *
+ * 아래 임계값은 **2026-08-28 KIS 실측가 대비 +10~25%**로 다시 벌린 값이다. 각 값은
+ * 같은 종목의 `quote.future`보다 반드시 낮아야 한다 — `engine.ts`의 `holdsFor`가
+ * 경계값을 지킨 것으로 보므로, 임계값이 미래값과 같아지면 `3개월 후` 토글이 죽는다.
+ *
+ *   종목            실측(08-28)   임계값      미래 fixture
+ *   SK텔레콤        98,600원      110,000원   140,000원
+ *   아모레퍼시픽    PER 44.13배   PER 55배    PER 63.0배
+ *   삼성전자        257,000원     285,000원   300,000원
+ *   카카오페이      47,350원      52,000원    55,000원
  */
 
 interface SeedPremiseVariant {
   base: Omit<Premise, "status" | "observedValue">;
+  /**
+   * 자동 확인(price/valuation) 전제라면 **현재 시점 화면에 뜨지 않는다** — 프로비저닝
+   * 때 DB에 한 번 찍히지만 조회 시 라이브 시세 판정에 덮인다(위 주석 참고). 직접 확인
+   * 전제라면 그대로 살아 화면에 그려진다.
+   */
   current: Pick<Premise, "status" | "observedValue">;
   future: Pick<Premise, "status" | "observedValue">;
 }
@@ -78,7 +102,7 @@ const SEED_A: SeedItem = {
     followup: [
       { questionId: "cheap-vs-what", selected: "peers" },
       { questionId: "metric", selected: "price-itself" },
-      { questionId: "target-price", selected: "custom", freeText: "105000" },
+      { questionId: "target-price", selected: "custom", freeText: "110000" },
     ],
     freeText: "5G 요금제 개편 이후 반등 여지가 있어 보여서 담아요.",
     createdAt: "2026-07-20T09:04:00+09:00",
@@ -98,7 +122,7 @@ const SEED_A: SeedItem = {
       {
         base: {
           id: "seed-a-p1",
-          statement: "10만 5,000원 이하일 때 저평가",
+          statement: "11만원 이하일 때 저평가",
           checkType: "price",
         },
         current: { status: "intact", observedValue: "99,600원" },
@@ -109,7 +133,8 @@ const SEED_A: SeedItem = {
 };
 
 // 종목 B — 아모레퍼시픽. PER 전제는 "3개월 후" 데모에서 깨지고 목표가 전제는 계속
-// 유지, qualitative 전제 1개 혼재.
+// 유지, qualitative 전제 1개 혼재. 시드 5종 중 valuation(PER) 자동 판정을 보여주는
+// 유일한 사례라, 임계값이 커져도 전제 종류는 가격으로 바꾸지 않는다 (#152).
 const SEED_B: SeedItem = {
   id: "seed-b",
   ticker: "090430",
@@ -138,7 +163,7 @@ const SEED_B: SeedItem = {
       {
         base: {
           id: "seed-b-p1",
-          statement: "PER 44배 이하 유지",
+          statement: "PER 55배 이하 유지",
           checkType: "valuation",
         },
         current: { status: "intact", observedValue: "42.1배" },
@@ -199,7 +224,7 @@ const SEED_D: SeedItem = {
     followup: [
       { questionId: "cheap-vs-what", selected: "peers" },
       { questionId: "metric", selected: "price-itself" },
-      { questionId: "target-price", selected: "custom", freeText: "275000" },
+      { questionId: "target-price", selected: "custom", freeText: "285000" },
     ],
     freeText: "메모리 업사이클 초입이라 보고, 파운드리도 바닥은 지났다고 판단해서 담아요.",
     createdAt: "2026-08-05T10:05:00+09:00",
@@ -219,7 +244,7 @@ const SEED_D: SeedItem = {
       {
         base: {
           id: "seed-d-p1",
-          statement: "27만 5,000원 이하일 때 저평가",
+          statement: "28만 5,000원 이하일 때 저평가",
           checkType: "price",
         },
         current: { status: "intact", observedValue: "261,500원" },
@@ -248,7 +273,7 @@ const SEED_E: SeedItem = {
     followup: [
       { questionId: "cheap-vs-what", selected: "peers" },
       { questionId: "metric", selected: "price-itself" },
-      { questionId: "target-price", selected: "custom", freeText: "48500" },
+      { questionId: "target-price", selected: "custom", freeText: "52000" },
     ],
     freeText: "간편결제 점유율이 계속 오르고 있고, 흑자전환 기대감도 있어서 매수했어요.",
     createdAt: "2026-07-01T09:04:00+09:00",
@@ -268,7 +293,7 @@ const SEED_E: SeedItem = {
       {
         base: {
           id: "seed-e-p1",
-          statement: "4만 8,500원 이하일 때 저평가",
+          statement: "5만 2,000원 이하일 때 저평가",
           checkType: "price",
         },
         current: { status: "intact", observedValue: "46,300원" },
