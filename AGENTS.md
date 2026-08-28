@@ -26,8 +26,7 @@ Single-context layout — `CONTEXT.md` + `docs/adr/` at the repo root. See `docs
 
 ### Tests
 
-`bun run test` (vitest, node 환경 — 지켜보며 돌리려면 `bun run test:watch`). 순수 함수만 대상이며 테스트는 대상 파일 옆에
-`*.test.ts`로 둔다. 범위와 이유는 `docs/adr/0006-vitest-for-pure-function-tests.md`.
+`bun run test` (vitest, node 환경 — 지켜보며 돌리려면 `bun run test:watch`). 순수 함수가 대상이고, 판정 기준은 순수함보다 **서버 전용 모듈 없이 node에서 임포트되는가**다 — ADR-0006이 #122에서 그 경계를 한 번 넓혔다. 테스트는 대상 파일 옆에 `*.test.ts`로 둔다. 범위와 이유는 `docs/adr/0006-vitest-for-pure-function-tests.md`.
 
 ### 페이지 모듈과 DB
 

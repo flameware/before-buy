@@ -3,7 +3,13 @@ import type { WatchlistItem } from "./types";
 export * from "./types";
 export * from "./categories";
 export { DEMO_WHITELIST, POPULAR_TICKERS, findDemoStock, popularStocks } from "./demo-whitelist";
-export { setThesisDraft, getThesisDraft, type ThesisDraft } from "./thesis-draft";
+export {
+  setThesisDraft,
+  getThesisDraft,
+  clearThesisDraft,
+  resolveThesisResultOnce,
+  type ThesisDraft,
+} from "./thesis-draft";
 export { addUserWatchlistItem, removeWatchlistItem } from "./user-watchlist";
 export { generateCritique, generatePremises } from "./critique";
 
