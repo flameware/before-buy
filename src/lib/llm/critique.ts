@@ -92,6 +92,7 @@ export async function generateCritiqueAndPremises(input: CritiqueInput): Promise
   }
 
   const parsed = await callWithValidationRetry(input);
+  // 아래 세 줄은 전부 경고 계열이다 — 지시 위반을 남기되 흐름을 바꾸지 않는다 (ADR-0013).
   logForbiddenWords(parsed);
   // 경고만 남기고 흐름은 그대로 둔다 — 이 전제는 검증에 걸리지 않고 그대로 저장된다 (#111).
   logUnavailableMetricPremises(parsed, { per: input.per, pbr: input.pbr });

@@ -27,7 +27,7 @@ const CheckConfigSchema = z.object({
 const PremiseSchema = z.object({
   statement: z.string(),
   check_type: z.enum(["price", "valuation", "fundamental", "qualitative"]),
-  // 객체째 `null`을 받는 것은 의도다 — 조이지 말 것 (프롬프트 명세 2장 "`check_config`의 모양", #120).
+  // 객체째 `null`을 받는 것은 의도다 — 조이지 말 것 (ADR-0013, 프롬프트 명세 2장 "`check_config`의 모양", #120).
   // #114 스모크에서 24%가 이 모양으로 왔고, `toCamelCheckConfig`가 네 키 모두 null인 객체와
   // 똑같이 `undefined`로 되돌리므로 도메인 결과가 같다. 필수로 바꾸면 그 24%가 파싱 실패 →
   // 재시도 → `LLMError`가 되어 S2가 죽는다.
@@ -123,7 +123,10 @@ export function findSemanticProblems(v: CritiqueRawOutput, anchorPrice: number):
   return problems;
 }
 
-/** 사용자 대상 문구 필드에 금지어가 섞였는지 확인하고, 발견되면 콘솔에 남긴다. */
+/**
+ * 사용자 대상 문구 필드에 금지어가 섞였는지 확인하고, 발견되면 콘솔에 남긴다.
+ * 경고로만 두고 재시도를 걸지 않는 이유는 ADR-0013 (#119).
+ */
 export function logForbiddenWords(input: CritiqueRawOutput): void {
   const textFields = [
     input.challenge_reason,
@@ -160,8 +163,8 @@ export interface UnavailableMetricPremise {
  * 판정 단위는 시스템 프롬프트의 지시와 **같은 지표 하나**다 — PER이 없어도 PBR이 왔다면
  * PBR 기준 전제는 정상이고 잡히지 않는다. 단위가 어긋나면 정상 경로를 오탐한다.
  *
- * **`findSemanticProblems`와 섞지 않는다.** 그쪽 반환값은 곧 재시도이고 재시도 실패는
- * `LLMError`라, PER 없는 종목에서 모델이 고집을 부리면 근거 쓰기 자체가 죽는다 —
+ * **`findSemanticProblems`와 섞지 않는다** (ADR-0013). 그쪽 반환값은 곧 재시도이고 재시도
+ * 실패는 `LLMError`라, PER 없는 종목에서 모델이 고집을 부리면 근거 쓰기 자체가 죽는다 —
  * 원래 버그보다 나쁜 실패 모드다. 여기서 나온 결과는 경고로만 쓰이고 응답도 전제도
  * 그대로 통과한다.
  */
@@ -205,7 +208,7 @@ export function logUnavailableMetricPremises(v: CritiqueRawOutput, metrics: Avai
  * **전 카테고리 90% 이상 `true`면 원칙 3이 죽은 것이다**(명세 5장).
  *
  * `logForbiddenWords`·`logUnavailableMetricPremises`와 같은 계열 — 반환값 없이 콘솔에만
- * 남기고 흐름을 바꾸지 않는다. **`findSemanticProblems`에 넣지 않는다.** 그쪽 반환값은 곧
+ * 남기고 흐름을 바꾸지 않는다 (ADR-0013). **`findSemanticProblems`에 넣지 않는다.** 그쪽 반환값은 곧
  * 재시도이고 재시도 실패는 `LLMError`인데, 편향은 응답 하나만 보고는 판정할 수 없는 것이라
  * 개별 응답을 실패시킬 근거가 되지 못한다.
  */
