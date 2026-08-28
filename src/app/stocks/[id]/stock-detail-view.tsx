@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DemoScenarioNote } from "@/components/demo/demo-scenario-note";
 import { ScreenHeader } from "@/components/layout/screen-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
@@ -260,8 +261,14 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
    * (기술스펙 7장). "이 화면의 값은 가정값입니다"는 비시드 종목에서 거짓이 된다.
    *
    * 게이트는 홈 배너와 같이 **시점 값 하나**다 — `hydrated`를 함께 보지 않는다.
+   *
+   * 모양은 홈의 안내문구와 같은 `DemoScenarioNote`를 쓴다 — 같은 성격의 선언이 화면마다
+   * 다른 무게로 보이면 사용자가 둘을 다른 것으로 읽는다. 문구만 다르다.
    */
-  const demoNote = scenario === "future" ? "3개월 후 보기가 켜져 있어요" : undefined;
+  const demoNote =
+    scenario === "future" ? (
+      <DemoScenarioNote>3개월 후 보기가 켜져 있어요</DemoScenarioNote>
+    ) : undefined;
 
   if (status === "loading") {
     // 예전에는 여기서 헤더만 렌더해 본문이 통째로 비어 있었다.
