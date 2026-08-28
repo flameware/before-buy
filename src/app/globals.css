@@ -51,7 +51,11 @@
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* 알약 층(버튼·인풋·배지·탭·프로그레스바). 프리셋의 2.6배는 높이 40px대 버튼을 곡률 36px로
+     만들어 사실상 알약이었다 — 2.0으로 낮춰 알약 인상을 걷어냈다(#145). 카드(1.8)보다 아주 조금만
+     둥글어, 두 층이 다르다는 것만 말하고 종류가 다른 물건처럼 보이지는 않는다.
+     드로어 팝업·얼럿 다이얼로그는 이 층이 아니라 카드 층(`rounded-2xl`)에 있다. */
+  --radius-4xl: calc(var(--radius) * 2);
 }
 
 :root {
@@ -88,7 +92,11 @@
   --chart-3: oklch(0.681 0.162 75.834);
   --chart-4: oklch(0.554 0.135 66.442);
   --chart-5: oklch(0.476 0.114 61.907);
-  --radius: 0.875rem;
+  /* 전체 곡률 스케일의 단 하나뿐인 출처 — 위 `@theme inline`의 모든 층이 여기에 배수를 곱한다.
+     shadcn 프리셋이 준 0.875rem(14px)은 서비스 전반이 지나치게 둥글게 읽혀 0.25rem로 낮췄다(#145).
+     이 값을 만질 때 `CONTEXT.md`의 "액자는 그 안의 카드보다 덜 둥글다"(#125)가 함께 지켜지는지 본다 —
+     액자는 `rounded-md`(0.8배), 카드는 `rounded-2xl`(1.8배)이라 배수가 유지되는 한 자동으로 참이다. */
+  --radius: 0.25rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.681 0.162 75.834);
