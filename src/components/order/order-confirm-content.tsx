@@ -133,7 +133,12 @@ export function OrderConfirmContent({
     );
   }
 
-  const loading = status === "loading" || !item;
+  // `!hydrated`도 로딩으로 접는다. 하이드레이션 전에는 데모 시점을 아직 모르므로 손에
+  // 들린 캐시가 `현재` 기준일 수 있고, 그 시세로 계산한 전제 배지는 틀릴 수 있다. 고정은
+  // 이제 재검증을 기다리지만(#141), **그리는 것**까지 막히지는 않는다 — 결정 지점 화면이
+  // `유지`를 한 프레임 보여줬다가 `달라짐`으로 뒤집는 것은 고정을 도입한 이유(ADR-0005)와
+  // 같은 이유로 안 된다. S1도 같은 게이트를 쓴다(`useWatchlistView`의 `isLoading`).
+  const loading = status === "loading" || !hydrated || !item;
 
   // 근거 카드 자리를 skeleton에서도 잡아둔다. 콜드 경로에서는 그 종목에 근거가 있는지
   // 로드 전에 알 수 없고(`findStock`은 mock 조회라 DB의 thesis를 모른다), 근거 있음이
@@ -164,7 +169,10 @@ export function OrderConfirmContent({
           </div>
         ) : thesis ? (
           <div className="flex flex-col gap-2">
-            <p className="text-sm text-muted-foreground">3주 전에 이렇게 생각하셨어요</p>
+            {/* 시점을 말하지 않는다. 데모에는 시계가 없어서 — `3개월 후`는 시세 변종일 뿐
+                `createdAt`은 그대로다 — 어떤 기준으로 계산해도 화면의 시제와 어긋난다(#141).
+                작성 시점을 알고 싶으면 S5가 절대 날짜로 말해준다. */}
+            <p className="text-sm text-muted-foreground">이렇게 생각하셨어요</p>
             <div className="flex flex-col gap-1 rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
               <p className="text-sm font-medium">{getCategory(thesis.category).label}</p>
               <p className="text-xs text-muted-foreground">
