@@ -35,9 +35,11 @@ export function PhoneFrame({
           // containing block으로 만든다 — 없으면 bottom sheet가 데스크톱 너비에서 프레임을
           // 벗어나 브라우저 전체를 덮는다. Drawer 쪽에서 이 엘리먼트로 직접 portal해야 실제로 적용된다.
           "group relative flex h-dvh w-full flex-col overflow-hidden bg-background [contain:layout]",
-          // 곡률은 `rounded-md`(= `--radius-md`, 11.2px) — 기기 목업이 아니라 뷰포트 액자라서
-          // 앱의 radius 스케일을 따른다. 예전의 40px은 카드(14px)의 2.9배라 헤더 좌우를
-          // 파고들었다. 토큰 밖 상수로 되돌리지 말 것 (#125).
+          // 곡률은 `rounded-md`(= `--radius-md`, `--radius`의 0.8배) — 기기 목업이 아니라 뷰포트
+          // 액자라서 앱의 radius 스케일을 따른다. 예전에 박아둔 40px은 당시 카드 곡률의 2.9배라
+          // 헤더 좌우를 파고들었다. 수치를 적지 않는 것은 스케일이 통째로 움직이기 때문이다(#145) —
+          // 액자가 카드(1.8배)보다 덜 둥글다는 관계만이 지켜야 할 것이다.
+          // 토큰 밖 상수로 되돌리지 말 것 (#125).
           "sm:h-[874px] sm:w-[402px] sm:rounded-md sm:border sm:border-border sm:shadow-xl",
         )}
       >
