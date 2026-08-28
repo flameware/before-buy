@@ -13,6 +13,7 @@ import { useDemoScenario } from "@/hooks/use-demo-scenario";
 import { splitByStatus, type BadgeState } from "@/lib/mock";
 import { badgeDisplay, badgeLabel, countByJudgment } from "@/lib/premises/badge";
 import { useChangeSummaryToast } from "@/hooks/use-change-summary-toast";
+import { useUnsupportedBuy } from "@/hooks/use-unsupported-buy";
 import { useWatchlistView } from "@/hooks/use-watchlist-view";
 import type { WatchlistViewItem } from "@/lib/watchlist/get-watchlist";
 
@@ -56,6 +57,7 @@ function StockCard({
   highlighted?: boolean;
 }) {
   const router = useRouter();
+  const declineBuy = useUnsupportedBuy();
   const quote = item.quote;
 
   // 배지를 그릴 수 있는지(조회 중·조회 실패면 판정 불가)는 `badgeDisplay`가 정한다 —
@@ -142,6 +144,12 @@ function StockCard({
           variant="buy"
           onClick={(e) => {
             e.stopPropagation();
+            // 근거가 없으면 S4를 열지 않는다 — 되비출 것이 없어 시트가 종목명과 현재가만
+            // 든 채로 뜬다(#143). 대신 그 자리에서 사실을 말하고 `proceed`는 남긴다.
+            if (!item.thesis) {
+              declineBuy(item.id, false);
+              return;
+            }
             router.push(`/order/${item.ticker}`);
           }}
         >

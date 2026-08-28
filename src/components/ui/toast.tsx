@@ -19,8 +19,8 @@ import { cn } from "@/lib/utils";
  * `role="dialog"`라 여기서 role을 덧씌우면 그 구조가 깨진다.
  */
 
-/** 4초 — 탭할 수 없으므로 "잡을 시간"은 필요 없고 "읽을 시간"만 있으면 된다. */
-const TOAST_TIMEOUT_MS = 4000;
+/** 2.5초 — 탭할 수 없으므로 "잡을 시간"은 필요 없고 "읽을 시간"만 있으면 된다. */
+const TOAST_TIMEOUT_MS = 2500;
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   // limit 1: 한 번에 하나만 뜬다 — 변동 요약과 미구현 안내가 겹칠 일도 사실상 없다.

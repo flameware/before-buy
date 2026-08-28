@@ -20,6 +20,7 @@ import { ScreenHeader } from "@/components/layout/screen-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
 import { useUnsupportedTradeToast } from "@/hooks/use-unsupported-trade-toast";
+import { useUnsupportedBuy } from "@/hooks/use-unsupported-buy";
 import { useWatchlistItemView } from "@/hooks/use-watchlist-view";
 import { composeView } from "@/lib/watchlist/compose-view";
 import { returnSinceAdded, returnSinceBuy } from "@/lib/watchlist/returns";
@@ -244,6 +245,7 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
   const [removing, startRemove] = useTransition();
   const { scenario, hydrated } = useDemoScenario();
   const notifyUnsupportedTrade = useUnsupportedTradeToast();
+  const declineBuy = useUnsupportedBuy();
 
   // S4와 같은 훅을 쓰되 시세는 고정하지 않는다 — S5는 결정 지점이 아니라 조회 화면이라
   // ADR-0002의 기본값(조용한 재검증)이 그대로 맞다.
@@ -303,8 +305,14 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
   }
 
   function handleBuy() {
-    // S1 카드의 `구매`와 같은 경로다 — 보유중의 추가 매수도 근거를 한 번 되비추고 지나간다.
-    router.push(`/order/${ticker}`);
+    // **여기서는 S4를 열지 않는다** (#143). 이 화면에는 근거와 전제 목록이 이미 펼쳐져
+    // 있어 시트가 보여줄 것이 전부 중복이고, `판매`만 토스트인 비대칭은 제품이 매수 쪽으로
+    // 기울었다는 신호가 된다(ADR-0009). 양쪽이 같은 자리에서 같은 방식으로 사실을 말한다.
+    //
+    // S1 카드의 `구매`는 `watching`에만 붙으므로, 이 변경으로 보유중 종목이 S4에 닿는
+    // 경로는 없어진다 — 의도한 결과다. 추가 매수 직전에 되비출 근거는 이 화면이 이미 다
+    // 보여주고 있다.
+    declineBuy(item.id, !!item.thesis);
   }
 
   /**
