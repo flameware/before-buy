@@ -37,11 +37,11 @@ export function ScreenHeaderRow({
 /** S1.5/S2/S3/S4/S5 공통 헤더 — `←` + 타이틀. S1은 뒤로가기가 없는 홈이라 셸을 직접 쓴다. */
 export function ScreenHeader({
   title,
-  subtitle,
+  note,
   onBack,
 }: {
   title: ReactNode;
-  subtitle?: ReactNode;
+  note?: ReactNode;
   onBack?: () => void;
 }) {
   const router = useRouter();
@@ -59,9 +59,11 @@ export function ScreenHeader({
         </button>
         <h1 className="text-base font-semibold">{title}</h1>
       </ScreenHeaderRow>
-      {/* `pl-8`은 위 타이틀과 가로를 맞추는 값이라 셸이 아니라 여기 남는다 — 뒤로가기가 있는
-          화면에만 해당한다. S1은 버튼이 영영 안 들어오므로 이 들여쓰기를 따라가지 않는다. */}
-      {subtitle ? <div className="mt-1 pl-8 text-sm text-muted-foreground">{subtitle}</div> : null}
+      {/* 타이틀에 들여쓰기를 맞추지 않는다 — 여기 서는 것은 타이틀에 달라붙는 캡션이 아니라
+          헤더 폭을 쓰는 **노트**다(현재 소비자는 S5의 데모 시점 선언 하나). `←` 자리만큼
+          비켜서면 같은 노트가 S1에서만 꽉 차 두 화면이 다른 요소처럼 보인다.
+          간격 `mt-3`은 S1이 자기 노트들에 쓰는 `gap-3`과 같은 값이다 (#129, #134). */}
+      {note ? <div className="mt-3">{note}</div> : null}
     </ScreenHeaderShell>
   );
 }

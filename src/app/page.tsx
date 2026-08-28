@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { useDemoScenario } from "@/hooks/use-demo-scenario";
 import { splitByStatus, type BadgeState } from "@/lib/mock";
 import { badgeDisplay, badgeLabel, countByJudgment } from "@/lib/premises/badge";
+import { DemoScenarioNote } from "@/components/demo/demo-scenario-note";
 import { useChangeSummaryToast } from "@/hooks/use-change-summary-toast";
 import { useUnsupportedBuy } from "@/hooks/use-unsupported-buy";
 import { useWatchlistView } from "@/hooks/use-watchlist-view";
@@ -214,7 +215,8 @@ export default function Home() {
     unknown: numUnknown,
     unjudged: numUnjudged,
   } = countByJudgment(watchlist);
-  useChangeSummaryToast(numChanged);
+  // 로딩 프레임은 넘기지 않는다(`ready`) — 그 프레임의 개수는 아직 `현재` 기준이다.
+  useChangeSummaryToast(scenario, numChanged, !loading);
 
   // 헤더 타이틀 행 아래에 붙는 문장들. 하나도 없으면 래퍼째 빠져야 한다 — 빈 래퍼가 남으면
   // 그 `mt-3`이 헤더를 12px 늘려, 방금 다른 화면과 맞춘 높이가 홈에서만 다시 어긋난다(#129).
@@ -255,9 +257,9 @@ export default function Home() {
         {hasHeaderNotes ? (
           <div className="mt-3 flex flex-col gap-3">
             {showFutureBanner ? (
-              <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+              <DemoScenarioNote>
                 서비스 컨셉 데모를 위해 3개월 후 상황을 가정한 값을 보여드립니다
-              </p>
+              </DemoScenarioNote>
             ) : null}
             {/* 달라짐 요약은 헤더에 상주하지 않고 토스트로 지나간다(#103, useChangeSummaryToast).
                 반면 아래 "시세를 불러오지 못해"는 사건이 아니라 풀리기 전까지 계속 참인 상태라
