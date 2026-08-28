@@ -27,6 +27,10 @@ const CheckConfigSchema = z.object({
 const PremiseSchema = z.object({
   statement: z.string(),
   check_type: z.enum(["price", "valuation", "fundamental", "qualitative"]),
+  // 객체째 `null`을 받는 것은 의도다 — 조이지 말 것 (프롬프트 명세 2장 "`check_config`의 모양", #120).
+  // #114 스모크에서 24%가 이 모양으로 왔고, `toCamelCheckConfig`가 네 키 모두 null인 객체와
+  // 똑같이 `undefined`로 되돌리므로 도메인 결과가 같다. 필수로 바꾸면 그 24%가 파싱 실패 →
+  // 재시도 → `LLMError`가 되어 S2가 죽는다.
   check_config: CheckConfigSchema.nullable(),
 });
 
