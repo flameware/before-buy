@@ -240,6 +240,45 @@ function PremiseRow({ premise, quotePending }: { premise: Premise; quotePending:
   );
 }
 
+/**
+ * **확인해볼 질문**(CONTEXT.md). S3에서 담기 직전에 한 번 읽히고 사라지던 질문을 상세에도
+ * 세운다 — 명세는 이 필드를 "다음 번 근거 갱신 때 숫자가 들어올 길"이라고 적어두었는데
+ * (프롬프트 명세 4-3), 담은 뒤 다시 보이는 곳이 없어 그 길이 실제로는 막혀 있었다 (#139).
+ *
+ * **읽기 전용이다.** 답을 받는 입력 장치를 여기 두지 않는다 — 답할 길은 아래 `생각 업데이트
+ * 하기` → S2 하나뿐이고, S2의 후속 질문은 고정 선택지 칩 + 무선택(`skipped`) 문법이라
+ * 자유 문항을 얹으면 `건너뛰기`가 두 뜻을 갖는다(#96). 그래서 이 섹션이 `전제별 상태`와
+ * 그 버튼 사이에 선다: 질문을 읽은 다음 손이 닿는 것이 근거 갱신이어야 한다.
+ *
+ * **카드는 섹션이 소유하고 질문은 행이다** — `전제별 상태`와 같은 골격이다(CONTEXT.md
+ * `섹션 카드`, #137). S3는 같은 질문을 불릿으로 세우지만 여기서는 S5 골격이 이긴다.
+ * 두 벌을 실제로 렌더해 보고 정했다: 불릿은 글머리 들여쓰기(`pl-5`)만큼 텍스트를 밀어내
+ * 바로 위 `전제별 상태` 카드와 왼쪽 정렬선이 어긋난다 — 섹션 카드가 세로로 쌓이는 이
+ * 화면에서 그 어긋남은 이 섹션에만 있는 문법으로 읽힌다.
+ *
+ * 대신 **행 간격이 경계를 다 짊어진다.** 질문은 두 줄로 넘치는 일이 잦아 `gap-3`에서는
+ * 접힌 둘째 줄과 다음 질문이 비슷한 거리에 놓였다 — `gap-4`가 그 비를 벌린다. `전제별
+ * 상태`(`gap-5`)보다 좁은 것은 행 안에 간격이 없기 때문이고, 안팎의 비가 경계를 만든다는
+ * 규율은 같다(#136).
+ *
+ * **빈 상태가 없다.** 질문이 없거나 근거가 없으면 호출부가 섹션째 그리지 않는다 —
+ * "질문이 없어요" 블록은 아무것도 말해주지 않으면서 자리만 차지한다.
+ */
+function OpenQuestionsSection({ questions }: { questions: string[] }) {
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-sm font-semibold text-muted-foreground">확인해볼 질문</h2>
+      <div className="flex flex-col gap-4 rounded-2xl bg-card px-4 py-4 ring-1 ring-foreground/10">
+        {questions.map((q, i) => (
+          <p key={i} className="text-sm">
+            {q}
+          </p>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function StockDetailView({ ticker, stockName }: { ticker: string; stockName: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -313,6 +352,9 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
   const sinceAdded = snapshot ? returnSinceAdded(snapshot.price, item.addedPrice) : null;
   const sinceBuy = isBought && snapshot ? returnSinceBuy(snapshot.price, item.avgBuyPrice) : null;
   const updateThesisLabel = item.thesis ? "생각 업데이트 하기" : "근거 적기";
+  // 최신 근거의 것만 본다 — `fetchLatestTheses`가 `version` 내림차순으로 한 겹만 집어오므로
+  // 여기서 회차를 고를 일이 없다(CONTEXT.md `근거 갱신`: 화면은 언제나 가장 최근 것만 본다).
+  const openQuestions = item.thesis?.critique.openQuestions ?? [];
 
   function handleUpdateThesis() {
     router.push(`/thesis/${ticker}`);
@@ -411,6 +453,11 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
             )}
           </section>
         ) : null}
+
+        {/* 시점을 말하지 않는다 — 바로 위 `내가 쓴 근거` 카드가 이미 작성일을 말한다.
+            "담을 때 나온 질문" 같은 꼬리표를 붙이면 이 질문이 지나간 것처럼 읽히는데,
+            아직 아무도 답하지 않았다는 것이 이 자리의 뜻이다. */}
+        {openQuestions.length > 0 ? <OpenQuestionsSection questions={openQuestions} /> : null}
 
         {/* 근거 갱신은 **두 상태 모두** body 맨 아래에 둔다 — 관심종목과 보유중이 같은
             골격을 갖게 하는 것이 이 배치의 목적이다(#105). 앰버라 body 안에서도 충분히
