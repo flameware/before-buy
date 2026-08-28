@@ -7,7 +7,8 @@
 [![대표 스크린샷 이미지](./assets/main.png)](https://before-buy-stock.vercel.app/)
 
 > 이미지를 누르면 서비스로 이동합니다. 따로 로그인할 필요 없이 체험할 수 있습니다.
-> 주소: https://before-buy-stock.vercel.app/
+
+주소: https://before-buy-stock.vercel.app/
 
 ---
 
