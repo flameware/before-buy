@@ -215,13 +215,8 @@ export default function Home() {
     unknown: numUnknown,
     unjudged: numUnjudged,
   } = countByJudgment(watchlist);
-  // **로딩 프레임의 개수는 세지 않는다.** 하이드레이션 전에는 `scenario`가 아직 `current`인데
-  // 두 쿼리의 `enabled: false`는 페치만 막지 캐시 읽기는 막지 않아, 토글을 켜기 전 방문이 남긴
-  // `현재` 기준 시세가 그대로 읽힌다. 그 프레임이 곧 `0 → N`이 되어 토스트가 사용자가 보고 있지
-  // 않은 시점의 개수로 확정되고, 뒤이어 `3개월 후` 개수가 올라와도 다시 발화하지 않는다.
-  // 로딩을 0으로 접는 것은 이 훅이 이미 기대는 규칙이다 — "로딩 중에는 개수가 0이므로 로딩
-  // 완료가 곧 0→N"(`use-change-summary-toast.ts`).
-  useChangeSummaryToast(loading ? 0 : numChanged);
+  // 로딩 프레임은 넘기지 않는다(`ready`) — 그 프레임의 개수는 아직 `현재` 기준이다.
+  useChangeSummaryToast(scenario, numChanged, !loading);
 
   // 헤더 타이틀 행 아래에 붙는 문장들. 하나도 없으면 래퍼째 빠져야 한다 — 빈 래퍼가 남으면
   // 그 `mt-3`이 헤더를 12px 늘려, 방금 다른 화면과 맞춘 높이가 홈에서만 다시 어긋난다(#129).

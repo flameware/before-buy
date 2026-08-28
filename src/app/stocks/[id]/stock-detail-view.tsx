@@ -276,7 +276,7 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
       <>
         {/* 로딩 중에는 관심종목인지 보유중인지 아직 모른다 — 북마크를 그리지 않는다. */}
         {/* 선언은 **로딩에도 선다.** 여기서 빠지면 본문 전환에서 헤더 높이가 뛴다 (#134). */}
-        <ScreenHeader title={stockName} subtitle={demoNote} />
+        <ScreenHeader title={stockName} note={demoNote} />
         <div className="flex flex-1 flex-col gap-6 px-4 py-4">
           <Skeleton className="h-20 rounded-2xl" />
           <div className="flex flex-col gap-2">
@@ -357,7 +357,7 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
 
   return (
     <>
-      <ScreenHeader title={stockName} subtitle={demoNote} />
+      <ScreenHeader title={stockName} note={demoNote} />
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
         <PriceFlowSection
           item={item}
