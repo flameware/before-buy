@@ -12,6 +12,18 @@ Five canonical roles, label strings equal to their names. See `docs/agents/triag
 
 Single-context layout — `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### 제품 명세
+
+`docs/prd/` — `화면명세.md`(화면별 구성·문구·상태), `기술스펙.md`(아키텍처·데이터 모델·외부 연동),
+`프롬프트 명세.md`(LLM 프롬프트). 코드 주석은 이 셋을 파일명이나 장 번호로만 가리킨다("기술스펙 7장",
+"화면명세 S5").
+
+**화면을 고치면서 명세도 고쳤다면 같은 커밋에 담는다** — 문서와 코드가 다른 속도로 흐르면, 명세를 읽어
+작업하는 다음 에이전트가 그 간극을 그대로 잘못된 작업으로 옮긴다(#99). 세 문서 모두 추적 대상이다.
+
+명세와 `CONTEXT.md`·`docs/adr/`가 어긋나면 **ADR이 이긴다** — 명세는 만들기 전에 쓴 것이고 ADR은
+만들면서 뒤집은 결정이다(예: ADR-0009가 `화면명세.md` S5의 "매도 검토 버튼은 뺐습니다"를 대체한다).
+
 ### Tests
 
 `bun run test` (vitest, node 환경 — 지켜보며 돌리려면 `bun run test:watch`). 순수 함수만 대상이며 테스트는 대상 파일 옆에
