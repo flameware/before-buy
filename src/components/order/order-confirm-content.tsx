@@ -1,11 +1,9 @@
 "use client";
 
-import { Minus, Plus } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { ScreenHeader } from "@/components/layout/screen-header";
@@ -31,14 +29,17 @@ function formatPrice(price: number): string {
  * S4 본문 — Drawer(소프트 내비게이션)와 전체 페이지(하드 내비게이션 폴백) 양쪽에서
  * 공유한다. 취소 버튼/외부 탭(Drawer)/헤더 뒤로가기(전체 페이지) 모두 같은 "나가기"
  * 경로(handleExit)를 타도록 Drawer/ScreenHeader까지 이 컴포넌트가 직접 소유한다 —
- * order_events cancel을 남기는 데 필요한 상태(수량, 종목)가 여기 한 곳에만 있고,
- * 부모 컴포넌트로 ref를 넘기는 대신 이렇게 하면 각 나가기 지점에서 명시적으로
- * 한 번만 기록하면 된다.
+ * order_events를 한 번만 남기는 `recordedRef`가 여기 한 곳에만 있고, 부모 컴포넌트로
+ * ref를 넘기는 대신 이렇게 하면 각 나가기 지점에서 명시적으로 한 번만 기록하면 된다.
+ *
+ * **이 화면이 확인시키는 것은 담을 때 적어둔 전제뿐이다** — 수량·합계는 뒤에 있을 실제
+ * 주문 화면의 몫이라 여기 두지 않는다(#143). 종목명과 현재가만 남는 이유는 "무엇을 지금
+ * 얼마에 사려는가"가 전제를 읽는 문맥이기 때문이고, 그 이상은 S5와의 중복이 된다.
  *
  * 데이터는 `useWatchlistItemView`가 S1의 목록 캐시에서 읽는다. S1에서 넘어온 경우
  * 근거·전제·종목명은 **첫 프레임부터 완성**되어 있고, 시세만 한 번 재확인한 뒤
  * `useFrozen`으로 고정된다(ADR-0005) — 이 화면은 목록이 아니라 결정 지점이라
- * `구매`를 누르기 직전에 합계가 손 밑에서 바뀌어서는 안 된다.
+ * `구매`를 누르기 직전에 판정 근거가 손 밑에서 바뀌어서는 안 된다.
  */
 export function OrderConfirmContent({
   ticker,
@@ -52,7 +53,6 @@ export function OrderConfirmContent({
   const router = useRouter();
   const { scenario, hydrated } = useDemoScenario();
   const notifyUnsupportedTrade = useUnsupportedTradeToast();
-  const [qty, setQty] = useState(INITIAL_QTY);
   const recordedRef = useRef(false);
 
   const { status, listItem, quote, quoteSettled } = useWatchlistItemView(
@@ -71,7 +71,15 @@ export function OrderConfirmContent({
   function record(action: OrderEventAction) {
     if (recordedRef.current) return;
     recordedRef.current = true;
-    const common = { thesisShown: !!item?.thesis, initialQty: INITIAL_QTY, finalQty: qty, action };
+    // 수량은 이 화면을 떠났지만 컬럼은 남겨둔다 — 죽은 지표 하나 때문에 스키마를
+    // 떨어뜨리면 되돌리는 비용이 지우는 비용보다 크다(#143). 두 값은 늘 같으므로
+    // `adjust`는 이제 어느 분기에서도 발생하지 않는다.
+    const common = {
+      thesisShown: !!item?.thesis,
+      initialQty: INITIAL_QTY,
+      finalQty: INITIAL_QTY,
+      action,
+    };
     if (item) {
       void recordOrderEventAction({ watchlistItemId: item.id, ...common });
       return;
@@ -88,10 +96,10 @@ export function OrderConfirmContent({
   }
 
   function handleBuy() {
-    // 주문 실행은 프로토타입 범위 밖이지만 **기록은 반드시 남긴다**(#105). `proceed`/`adjust`는
-    // 이 제품의 핵심 지표 — "근거를 본 뒤 수량을 조정했는가"(가설 2, 화면명세 S4)이고,
-    // 여기를 토스트로 갈아치우면 order_events에는 cancel과 update_thesis만 쌓인다.
-    record(qty === INITIAL_QTY ? "proceed" : "adjust");
+    // 주문 실행은 프로토타입 범위 밖이지만 **기록은 반드시 남긴다**(#105) — 여기를
+    // 토스트로 갈아치우면 order_events에는 cancel과 update_thesis만 쌓이고, "근거를
+    // 보고도 그대로 샀다"는 대조군이 통째로 사라진다.
+    record("proceed");
     // 홈으로 보내지 않는다 — 아무 일도 일어나지 않았는데 "담긴 종목이 강조된 홈"으로
     // 돌아가면 화면이 주문이 체결된 척을 한다. 시트는 열린 채로 두고 사실만 말한다.
     notifyUnsupportedTrade("buy");
@@ -153,7 +161,9 @@ export function OrderConfirmContent({
 
   const body = (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
+      {/* `DrawerHeader`가 `pb-0`이라 위쪽 여백은 본문이 만든다. 헤더를 고치면 앱의 다른
+          Drawer가 함께 움직이므로 여기서 잡고, 값은 본문이 이미 쓰는 `gap-4`와 맞춘다. */}
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4 pb-4">
         {loading ? (
           <div className="flex flex-col gap-2">
             <Skeleton className="h-5 w-40" />
@@ -169,41 +179,68 @@ export function OrderConfirmContent({
           </div>
         ) : thesis ? (
           <div className="flex flex-col gap-2">
-            {/* 시점을 말하지 않는다. 데모에는 시계가 없어서 — `3개월 후`는 시세 변종일 뿐
-                `createdAt`은 그대로다 — 어떤 기준으로 계산해도 화면의 시제와 어긋난다(#141).
-                작성 시점을 알고 싶으면 S5가 절대 날짜로 말해준다. */}
-            <p className="text-sm text-muted-foreground">이렇게 생각하셨어요</p>
-            <div className="flex flex-col gap-1 rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
-              <p className="text-sm font-medium">{getCategory(thesis.category).label}</p>
-              <p className="text-xs text-muted-foreground">
-                {thesis.freeText ?? "몇 가지 질문에 답하며 담았어요."}
-              </p>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">전제 상태</span>
-              {badge?.kind === "pending" ? (
-                <Skeleton className="h-5 w-12 rounded-full" />
-              ) : badge?.kind === "unknown" || badge?.kind === "unjudged" ? (
-                // 배지는 같은 "확인 불가"를 쓴다 — 사용자에게 결론은 같기 때문이다.
-                // 갈리는 것은 아래 딸린 설명이며, 원인이 다르므로 문구도 갈려야 한다(#102).
-                <Badge variant="outline">확인 불가</Badge>
-              ) : (
-                <Badge variant={changed ? "destructive" : "secondary"}>
-                  {changed ? "달라짐" : "유지"}
-                </Badge>
-              )}
-            </div>
-            {badge?.kind === "unknown" ? (
-              <p className="text-xs text-muted-foreground">
-                시세를 불러오지 못해 지금은 근거가 유효한지 확인할 수 없어요.
-              </p>
-            ) : badge?.kind === "unjudged" ? (
-              // 이 종목은 시세가 정상으로 도착해 있다 — 시세를 원인으로 지목하면 두 번째
-              // 거짓말이 된다. 무엇을 해야 하는지는 S5의 전제 한 줄이 말한다(#92).
-              <p className="text-xs text-muted-foreground">
-                이 근거에는 시스템이 판정할 수 없는 조건이 있어 지금은 확인할 수 없어요.
-              </p>
-            ) : null}
+            {changed ? (
+              /* **깨진 전제가 근거 요약을 대체한다.** 매수 직전에 필요한 것은 "저평가라고
+                 생각했다"가 아니라 "PER 15배가 지금 22배다"이고, 옛 생각을 먼저 세우면
+                 틀어진 사실이 그 뒤에 놓인다(#143). `유지`에서는 반대로 근거 요약이 유일한
+                 내용이라 그대로 남는다.
+
+                 `전제 상태 · [달라짐]` 배지 행도 여기서는 그리지 않는다 — 깨진 전제가
+                 눈앞에 펼쳐져 있는데 배지가 같은 말을 한 번 더 한다. */
+              <>
+                <p className="text-sm text-muted-foreground">담으실 때와 달라진 게 있어요</p>
+                <div className="flex flex-col gap-3 rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
+                  {thesis.premises
+                    .filter((p) => p.status === "broken")
+                    .map((p) => (
+                      <div key={p.id} className="flex flex-col gap-0.5">
+                        <p className="text-sm font-medium">{p.statement}</p>
+                        {/* 저장된 status가 출처인 전제(`fundamental`/`qualitative`,
+                            ADR-0004)는 관측값이 없을 수 있다 — 없으면 문장만 세운다. */}
+                        {p.observedValue ? (
+                          <p className="text-xs text-destructive">지금은 {p.observedValue}</p>
+                        ) : null}
+                      </div>
+                    ))}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* 시점을 말하지 않는다. 데모에는 시계가 없어서 — `3개월 후`는 시세 변종일 뿐
+                    `createdAt`은 그대로다 — 어떤 기준으로 계산해도 화면의 시제와 어긋난다(#141).
+                    작성 시점을 알고 싶으면 S5가 절대 날짜로 말해준다. */}
+                <p className="text-sm text-muted-foreground">이렇게 생각하셨어요</p>
+                <div className="flex flex-col gap-1 rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
+                  <p className="text-sm font-medium">{getCategory(thesis.category).label}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {thesis.freeText ?? "몇 가지 질문에 답하며 담았어요."}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">전제 상태</span>
+                  {badge?.kind === "pending" ? (
+                    <Skeleton className="h-5 w-12 rounded-full" />
+                  ) : badge?.kind === "unknown" || badge?.kind === "unjudged" ? (
+                    // 배지는 같은 "확인 불가"를 쓴다 — 사용자에게 결론은 같기 때문이다.
+                    // 갈리는 것은 아래 딸린 설명이며, 원인이 다르므로 문구도 갈려야 한다(#102).
+                    <Badge variant="outline">확인 불가</Badge>
+                  ) : (
+                    <Badge variant="secondary">유지</Badge>
+                  )}
+                </div>
+                {badge?.kind === "unknown" ? (
+                  <p className="text-xs text-muted-foreground">
+                    시세를 불러오지 못해 지금은 근거가 유효한지 확인할 수 없어요.
+                  </p>
+                ) : badge?.kind === "unjudged" ? (
+                  // 이 종목은 시세가 정상으로 도착해 있다 — 시세를 원인으로 지목하면 두 번째
+                  // 거짓말이 된다. 무엇을 해야 하는지는 S5의 전제 한 줄이 말한다(#92).
+                  <p className="text-xs text-muted-foreground">
+                    이 근거에는 시스템이 판정할 수 없는 조건이 있어 지금은 확인할 수 없어요.
+                  </p>
+                ) : null}
+              </>
+            )}
             {changed ? (
               <button
                 type="button"
@@ -216,61 +253,18 @@ export function OrderConfirmContent({
           </div>
         ) : null}
 
-        {/* 종목명·수량·버튼은 fetch 없이 첫 프레임부터 그린다 — 수량 조절은 가격을 몰라도
-            의미가 있고, 버튼 바가 처음부터 자리를 잡아야 시트 높이가 흔들리지 않는다. */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">{stockName}</span>
-            {loading || item.quote.state === "loading" ? (
-              <Skeleton className="h-5 w-24" />
-            ) : (
-              <span className="text-sm text-muted-foreground">
-                {item.quote.state === "ok" ? formatPrice(item.quote.snapshot.price) : "시세 조회 실패"}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">수량</span>
-            <div className="flex items-center gap-1.5">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                onClick={() => setQty((q) => Math.max(1, q - 1))}
-                aria-label="수량 줄이기"
-              >
-                <Minus />
-              </Button>
-              <Input
-                type="number"
-                min={1}
-                value={qty}
-                onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
-                className="w-14 text-center"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                onClick={() => setQty((q) => q + 1)}
-                aria-label="수량 늘리기"
-              >
-                <Plus />
-              </Button>
-            </div>
-          </div>
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>합계</span>
-            {loading || item.quote.state === "loading" ? (
-              <Skeleton className="h-5 w-24" />
-            ) : (
-              <span>
-                {item.quote.state === "ok"
-                  ? formatPrice(item.quote.snapshot.price * qty)
-                  : "시세 조회 실패"}
-              </span>
-            )}
-          </div>
+        {/* 종목명은 fetch 없이 첫 프레임부터 그린다 — 무엇을 사려는지는 시세를 몰라도
+            확정이고, 자리가 처음부터 잡혀야 시트 높이가 흔들리지 않는다. 현재가까지만
+            두는 이유는 전제를 읽는 문맥이 거기서 끝나기 때문이다(#143). */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">{stockName}</span>
+          {loading || item.quote.state === "loading" ? (
+            <Skeleton className="h-5 w-24" />
+          ) : (
+            <span className="text-sm text-muted-foreground">
+              {item.quote.state === "ok" ? formatPrice(item.quote.snapshot.price) : "시세 조회 실패"}
+            </span>
+          )}
         </div>
       </div>
 
