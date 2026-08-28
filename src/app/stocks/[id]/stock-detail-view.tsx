@@ -197,14 +197,31 @@ function PriceFlowSection({
 }
 
 /**
+ * 전제 한 건. **카드가 아니라 행이다** — 카드는 섹션이 소유한다(CONTEXT.md `섹션 카드`, #137).
+ *
+ * 행끼리는 간격만으로 갈린다. 구분선을 넣지 않는 이유는 이 화면에서 선이 이미 뜻을 갖고 있기
+ * 때문이다 — 근거 카드의 실선은 문단 구분, 가격 흐름의 점선은 "위는 관측값 아래는 파생값"이다.
+ * 여기 실선을 하나 더 그으면 방금 걷어낸 분절이 선의 형태로 되살아난다.
+ *
+ * 그래서 **행 안 간격(`gap-1`)과 행 사이 간격(섹션의 `gap-5`)의 차이가 유일한 경계다.** 둘의
+ * 비가 좁아지면 세 전제가 한 덩어리로 뭉개지므로, 한쪽만 손대지 않는다 (#136이 S1에서 "안쪽
+ * 여백이 바깥 간격보다 크면 묶임이 뒤집힌다"고 기록한 것과 같은 규율이다).
+ *
+ * 깨진 전제의 강조는 붉은 문구뿐이다. 배경 틴트도 프로토타입에서 함께 봤지만, 틴트가 행을 덮으면
+ * 그 행만 카드처럼 읽혀 없앤 문법이 색으로 되살아난다 — 붉은 문구는 두 줄이라 그러지 않아도
+ * 묻히지 않는다.
+ *
  * 배지와 그 아래 문구는 `premiseDisplay` 한 곳에서 함께 결정된다 — 여기서 갈라 보면
  * "자동 확인"과 "아직 직접 확인이 필요해요"가 한 줄에 공존하는 #88이 다시 난다.
  */
 function PremiseRow({ premise, quotePending }: { premise: Premise; quotePending: boolean }) {
   const { badge, body } = premiseDisplay(premise, quotePending);
   return (
-    <div className="flex flex-col gap-1 rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
-      <div className="flex items-center justify-between gap-3">
+    <div className="flex flex-col gap-1">
+      {/* `items-start` — 전제 문장은 두 줄로 넘어간다. 세로 중앙에 두면 배지가 둘째 줄
+          높이까지 내려와, 전제마다 배지의 y가 문장 길이에 따라 달라진다. 오른쪽 배지 열의
+          세로 스캔선이 그렇게 깨진다. 배지는 문장 첫 줄에 맞춰 선다. */}
+      <div className="flex items-start justify-between gap-3">
         <span className="text-sm font-medium">{premise.statement}</span>
         <Badge variant={badge === "auto" ? "secondary" : "outline"}>
           {badge === "auto" ? "자동 확인" : "직접 확인 필요"}
@@ -354,7 +371,7 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
           <section className="flex flex-col gap-2">
             <h2 className="text-sm font-semibold text-muted-foreground">전제별 상태</h2>
             {item.thesis.premises.length > 0 ? (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-5 rounded-2xl bg-card px-4 py-4 ring-1 ring-foreground/10">
                 {item.thesis.premises.map((p) => (
                   <PremiseRow key={p.id} premise={p} quotePending={quotePending} />
                 ))}
