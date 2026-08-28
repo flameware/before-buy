@@ -75,7 +75,7 @@ function StockCard({
       // 것은 이제 두께다: `py-4`로 두껍게 하고 행 사이 간격은 0이다. 여기서 `py-3`으로
       // 되돌리면 안쪽 여백이 행 사이보다 커져 "한 행 안"이 "행 사이"보다 벌어져 보인다.
       className={
-        "flex w-full items-center gap-3 px-4 py-4 text-left transition-colors " +
+        "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors " +
         // 하이라이트가 링이 아니라 배경 틴트인 이유: 무테 목록에서 링만 뜨면 "이 행만
         // 카드다"로 읽혀 방금 없앤 문법이 되살아난다. 틴트는 행 전체를 덮으므로 경계가
         // 흐린 목록에서 **어디까지가 그 행인지를 하이라이트가 겸해서 알려준다**.
@@ -158,7 +158,7 @@ function StockCard({
  */
 function StockCardSkeleton({ withBuyButton }: { withBuyButton: boolean }) {
   return (
-    <div className="flex w-full items-center gap-3 px-4 py-4">
+    <div className="flex w-full items-center gap-3 px-4 py-3">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Skeleton className="h-5 w-28" />
         <Skeleton className="h-5 w-16 rounded-4xl" />
