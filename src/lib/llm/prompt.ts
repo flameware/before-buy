@@ -269,16 +269,13 @@ function fundamentalExample(): Anthropic.MessageParam[] {
 카테고리: fundamental
 
 후속 질문 답변:
-- 어떤 성장을 기대하세요?
-  → 신사업·신제품
-- 언제쯤 확인할 수 있을까요?
-  → 정해두지 않음
-- 기대만큼 안 나오면 어떻게 하실 건가요?
-  → 더 기다린다
+어떤 성장을 기대하세요?: 신사업·신제품
+언제쯤 확인할 수 있을까요?: 정해두지 않음
+기대만큼 안 나오면 어떻게 하실 건가요?: 더 기다린다
 
 자유 서술: 로보틱스랑 자율주행 쪽에 투자를 많이 하고 있어서
 
-현재 지표: 현재가 312,000원 / PER 6.21 / PBR 0.68`),
+현재 지표: 현재가 312000원 / PER 6.21 / PBR 0.68`),
     assistantExample({
       is_challengeable: true,
       challenge_reason:
@@ -329,16 +326,13 @@ function undervaluedExample(): Anthropic.MessageParam[] {
 카테고리: undervalued
 
 후속 질문 답변:
-- 무엇 대비 싸다고 보세요?
-  → 동종업계
-- 어느 지표로 보셨어요?
-  → PER
-- 어디까지 오르면 제값이라고 보세요?
-  → 2,000,000원
+무엇 대비 싸다고 보세요?: 동종업계
+어느 지표로 보셨어요?: PER
+어디까지 오르면 제값이라고 보세요?: 2,000,000원
 
 자유 서술: (작성 안 함)
 
-현재 지표: 현재가 1,678,000원 / PER 7.53 / PBR 4.56`),
+현재 지표: 현재가 1678000원 / PER 7.53 / PBR 4.56`),
     assistantExample({
       is_challengeable: true,
       challenge_reason: "PER만 보고 싸다고 판단하셨는데, 순자산 대비로는 오히려 비싼 편입니다",
@@ -397,16 +391,13 @@ function undervaluedMissingMetricExample(): Anthropic.MessageParam[] {
 카테고리: undervalued
 
 후속 질문 답변:
-- 무엇 대비 싸다고 보세요?
-  → 자산가치
-- 어느 지표로 보셨어요?
-  → PER
-- 어디까지 오르면 제값이라고 보세요?
-  → 정하지 않음
+무엇 대비 싸다고 보세요?: 자산가치
+어느 지표로 보셨어요?: PER
+어디까지 오르면 제값이라고 보세요?: 정하지 않음
 
 자유 서술: (작성 안 함)
 
-현재 지표: 현재가 74,300원 / PER 정보 없음 / PBR 0.31`),
+현재 지표: 현재가 74300원 / PER 정보 없음 / PBR 0.31`),
     assistantExample({
       is_challengeable: true,
       challenge_reason: "PER로 보셨다고 했는데 지금 이 종목은 PER이 나오지 않습니다",
@@ -451,16 +442,13 @@ function themeExample(): Anthropic.MessageParam[] {
 카테고리: theme
 
 후속 질문 답변:
-- 어떤 테마인가요?
-  → 유럽 재무장
-- 이 흐름이 얼마나 갈 거라고 보세요?
-  → 모르겠어요
-- 테마가 식었다는 건 뭘 보면 알까요?
-  → 생각 안 해봤어요
+어떤 테마인가요?: 유럽 재무장
+이 흐름이 얼마나 갈 거라고 보세요?: 모르겠어요
+테마가 식었다는 건 뭘 보면 알까요?: 생각 안 해봤어요
 
 자유 서술: 수출 계약 뉴스가 계속 나와서
 
-현재 지표: 현재가 892,000원 / PER 28.4 / PBR 5.12`),
+현재 지표: 현재가 892000원 / PER 28.4 / PBR 5.12`),
     assistantExample({
       is_challengeable: true,
       challenge_reason: "언제까지 갈지도, 식었다는 걸 어떻게 알지도 정해두지 않으셨습니다",
@@ -511,16 +499,13 @@ function dividendExample(): Anthropic.MessageParam[] {
 카테고리: dividend
 
 후속 질문 답변:
-- 지금 배당수익률은 확인하셨어요?
-  → 네, 충분합니다
-- 배당이 줄어도 계속 들고 계실 건가요?
-  → 아니요, 팔겠습니다
-- 얼마나 오래 보실 생각이세요?
-  → 3년
+지금 배당수익률은 확인하셨어요?: 네, 충분합니다
+배당이 줄어도 계속 들고 계실 건가요?: 아니요, 팔겠습니다
+얼마나 오래 보실 생각이세요?: 3년
 
 자유 서술: 배당을 꾸준히 늘려온 기록이 길어서 믿고 갑니다
 
-현재 지표: 현재가 138,500원 / PER 13.2 / PBR 1.24`),
+현재 지표: 현재가 138500원 / PER 13.2 / PBR 1.24`),
     assistantExample({
       is_challengeable: false,
       challenge_reason: "배당이 줄어들 때 어떻게 할지까지 미리 정해두셨습니다",
@@ -552,16 +537,13 @@ function technicalExample(): Anthropic.MessageParam[] {
 카테고리: technical
 
 후속 질문 답변:
-- 어떤 신호를 보셨어요?
-  → 이동평균 돌파
-- 신호가 틀렸다면 어디서 정리하실 건가요?
-  → 240,000원
-- 목표가는 정하셨어요?
-  → 300,000원
+어떤 신호를 보셨어요?: 이동평균 돌파
+신호가 틀렸다면 어디서 정리하실 건가요?: 240,000원
+목표가는 정하셨어요?: 300,000원
 
 자유 서술: 60일선 위로 올라왔고 거래량도 늘었습니다
 
-현재 지표: 현재가 261,500원 / PER 11.73 / PBR 3.04`),
+현재 지표: 현재가 261500원 / PER 11.73 / PBR 3.04`),
     assistantExample({
       is_challengeable: false,
       challenge_reason: "들어갈 자리와 나올 자리를 모두 정해두셨습니다",
@@ -590,16 +572,13 @@ function recommendedExample(): Anthropic.MessageParam[] {
 카테고리: recommended
 
 후속 질문 답변:
-- 어디서 보셨어요?
-  → 유튜브·방송
-- 그분이 왜 좋다고 하던가요?
-  → AI 사업이 곧 실적으로 나온다고
-- 그 이유를 직접 확인해보셨어요?
-  → 아니요
+어디서 보셨어요?: 유튜브·방송
+그분이 왜 좋다고 하던가요?: AI 사업이 곧 실적으로 나온다고
+그 이유를 직접 확인해보셨어요?: 아니요
 
 자유 서술: (작성 안 함)
 
-현재 지표: 현재가 241,000원 / PER 18.7 / PBR 1.42`),
+현재 지표: 현재가 241000원 / PER 18.7 / PBR 1.42`),
     assistantExample({
       is_challengeable: true,
       challenge_reason: "들으신 이유를 아직 직접 확인해보지 않으셨습니다",
@@ -644,16 +623,13 @@ function gutExample(): Anthropic.MessageParam[] {
 카테고리: gut
 
 후속 질문 답변:
-- 어떤 느낌이세요?
-  → 요즘 자주 보인다
-- 얼마나 넣으실 생각이세요?
-  → 평소보다 크게
-- 틀려도 괜찮은 금액인가요?
-  → 생각 안 해봤어요
+어떤 느낌이세요?: 요즘 자주 보인다
+얼마나 넣으실 생각이세요?: 평소보다 크게
+틀려도 괜찮은 금액인가요?: 생각 안 해봤어요
 
 자유 서술: (작성 안 함)
 
-현재 지표: 현재가 58,700원 / PER 41.3 / PBR 1.18`),
+현재 지표: 현재가 58700원 / PER 41.3 / PBR 1.18`),
     assistantExample({
       is_challengeable: true,
       challenge_reason: "느낌으로 시작하셨는데 금액은 평소보다 크게 잡으셨습니다",

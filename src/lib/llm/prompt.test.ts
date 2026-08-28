@@ -7,7 +7,8 @@
 
 import { describe, expect, it } from "vitest";
 import type { ThesisCategory } from "@/lib/mock/types";
-import { buildFewShotMessages, buildSystemPrompt } from "./prompt";
+import { buildFollowupSummary } from "@/lib/thesis/followup-summary";
+import { buildFewShotMessages, buildSystemPrompt, buildUserMessage } from "./prompt";
 import { CritiqueOutputSchema, findSemanticProblems } from "./schemas";
 import type { CritiqueInput } from "./types";
 
@@ -21,13 +22,19 @@ const CATEGORIES: ThesisCategory[] = [
   "gut",
 ];
 
+/** 프로덕션 형식의 후속 질문 요약을 만드는 재료 — 답한 문항과 건너뛴 문항을 한 벌씩 담는다. */
+const SAMPLE_ANSWERS = [
+  { questionId: "signal-type", selected: "ma-breakout" },
+  { questionId: "stop-loss", skipped: true },
+];
+
 function input(category: ThesisCategory, overrides: Partial<CritiqueInput> = {}): CritiqueInput {
   return {
     sessionId: "s",
     ticker: "000000",
     stockName: "테스트종목",
     category,
-    followupSummary: "- 질문\n  → 답",
+    followupSummary: buildFollowupSummary("technical", SAMPLE_ANSWERS),
     price: 10_000,
     per: 10,
     pbr: 1,
@@ -91,6 +98,75 @@ describe("few-shot 예시 — 스스로 규칙을 어기지 않는다", () => {
   });
 });
 
+/**
+ * 명세 3장이 스스로 세운 원칙 — few-shot의 user 턴은 실제 입력과 **글자 그대로 같은 형식**이어야
+ * 한다. 카테고리 자리에 한국어 라벨 대신 원시 값(`undervalued`)을 쓰기로 한 근거가 이것이었는데,
+ * 정작 후속 질문 항목과 현재가 표기가 그 원칙을 어기고 있었다 (#121).
+ *
+ * 예시가 카테고리마다 한 벌뿐이라(#114) 그 한 벌이 형식을 가르치는 비중이 크다 — 어긋난 예시를
+ * 본 뒤 다른 모양의 입력을 받게 된다.
+ *
+ * **지금 형식이 맞다고 다시 적는 스냅샷이 아니다.** `buildUserMessage`가 실제로 낸 문자열에서
+ * 뼈대를 뽑아 대조하므로, 프로덕션 형식이 바뀌면 이 테스트가 예시를 함께 끌고 간다.
+ */
+describe("few-shot 예시 — user 턴이 실제 입력과 같은 형식이다", () => {
+  const reference = buildUserMessage(input("technical", { price: 261_500 }));
+
+  /** `buildUserMessage`는 빈 줄로 네 덩어리를 만든다. 그 경계가 뼈대의 첫 겹이다. */
+  function blocksOf(message: string): string[] {
+    const blocks = message.split("\n\n");
+    expect(blocks).toHaveLength(4);
+    return blocks;
+  }
+
+  /** 값을 뺀 줄머리들. 라벨과 그 순서가 형식이다. */
+  function labelsOf(message: string): string[] {
+    return blocksOf(message)
+      .flatMap((block) => block.split("\n"))
+      .map((line) => line.slice(0, line.indexOf(":") + 1));
+  }
+
+  const referenceLabels = labelsOf(reference);
+  const followupLabels = labelsOf(reference).slice(3);
+
+  it.each(ALL_EXAMPLES)("$label 예시가 네 덩어리로 나뉜다", ({ messages }) => {
+    expect(() => blocksOf(messages[0].content as string)).not.toThrow();
+  });
+
+  it.each(ALL_EXAMPLES)("$label 예시의 고정 라벨이 buildUserMessage와 같다", ({ messages }) => {
+    const labels = labelsOf(messages[0].content as string);
+    // 후속 질문 항목 수는 카테고리마다 다르므로, 앞 세 줄과 마지막 두 줄만 대조한다.
+    expect(labels.slice(0, 3)).toEqual(referenceLabels.slice(0, 3));
+    expect(labels.slice(-2)).toEqual(referenceLabels.slice(-2));
+  });
+
+  it.each(ALL_EXAMPLES)("$label 예시의 후속 질문 항목이 한 줄짜리다", ({ messages }) => {
+    const [, followupBlock] = blocksOf(messages[0].content as string);
+    const items = followupBlock.split("\n").slice(1);
+    expect(items.length).toBeGreaterThan(0);
+    for (const item of items) {
+      // `buildFollowupSummary`가 내는 모양은 `{질문}: {답}` 한 줄이다.
+      expect(item).toMatch(/^[^:\n]+: .+$/);
+      expect(item).not.toContain("→");
+      expect(item.startsWith("- ")).toBe(false);
+    }
+    // 참조가 같은 규칙을 만족하는지도 함께 본다 — 규칙이 프로덕션에서 왔음을 잠근다.
+    expect(followupLabels.every((label) => label.endsWith(":"))).toBe(true);
+  });
+
+  it.each(ALL_EXAMPLES)("$label 예시의 현재가에 콤마가 없다", ({ messages }) => {
+    const [, , , metrics] = blocksOf(messages[0].content as string);
+    // `buildUserMessage`는 price(number)를 그대로 보간하므로 천 단위 구분자가 없다.
+    expect(metrics).toMatch(/^현재 지표: 현재가 \d+원 \/ PER .+ \/ PBR .+$/);
+  });
+
+  it("참조 문자열 자체가 위 규칙을 만족한다", () => {
+    const [, , , metrics] = blocksOf(reference);
+    expect(metrics).toMatch(/^현재 지표: 현재가 \d+원 \/ PER .+ \/ PBR .+$/);
+    expect(reference).not.toContain("→");
+  });
+});
+
 describe("buildFewShotMessages — 카테고리와 짝을 맞춘다", () => {
   it.each(CATEGORIES)("%s는 한 벌(user + assistant 두 개)만 보낸다", (category) => {
     expect(buildFewShotMessages(input(category))).toHaveLength(2);
@@ -114,7 +190,8 @@ describe("buildFewShotMessages — 카테고리와 짝을 맞춘다", () => {
     const messages = buildFewShotMessages(input("undervalued", { per: undefined }));
     expect(messages).toHaveLength(2);
     expect(messages[0].content).toContain("PER 정보 없음");
-    expect(messages[0].content).toContain("→ PER");
+    // 사용자가 PER로 답했는데 그 PER이 없는 상황 — 변형을 가르는 것이 이 답이다.
+    expect(messages[0].content).toContain("어느 지표로 보셨어요?: PER");
   });
 
   it("다른 카테고리는 지표가 비어도 자기 예시를 그대로 쓴다", () => {
