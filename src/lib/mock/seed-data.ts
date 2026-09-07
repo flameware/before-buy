@@ -17,7 +17,7 @@ export const SEED_PREMISE_CHECK_CONFIG: Record<string, PremiseCheckConfig> = {
   "seed-b-p1": { kind: "value-ceiling", metric: "per", value: 55 },
   "seed-b-p2": { kind: "target-price", value: 210_000 },
   "seed-d-p1": { kind: "value-ceiling", value: 285_000 },
-  "seed-e-p1": { kind: "value-ceiling", value: 52_000 },
+  "seed-e-p1": { kind: "value-ceiling", value: 1_700_000 },
 };
 
 /**
@@ -40,15 +40,15 @@ export const SEED_PREMISE_CHECK_CONFIG: Record<string, PremiseCheckConfig> = {
  * 올려왔다: PER 15배 → 44배(#66) → 55배(#152). 세 번째 추격이며 임시방편이다.
  * 구조적 해결(프로비저닝 시점 실측의 배수로 임계값을 구워 넣기)은 #151에서 다룬다.
  *
- * 아래 임계값은 **2026-08-28 KIS 실측가 대비 +10~25%**로 다시 벌린 값이다. 각 값은
- * 같은 종목의 `quote.future`보다 반드시 낮아야 한다 — `engine.ts`의 `holdsFor`가
- * 경계값을 지킨 것으로 보므로, 임계값이 미래값과 같아지면 `3개월 후` 토글이 죽는다.
+ * 아래 임계값은 **KIS 실측가 대비 +10~25%**로 벌린 값이다. 각 값은 같은 종목의
+ * `quote.future`보다 반드시 낮아야 한다 — `engine.ts`의 `holdsFor`가 경계값을 지킨
+ * 것으로 보므로, 임계값이 미래값과 같아지면 `3개월 후` 토글이 죽는다.
  *
- *   종목            실측(08-28)   임계값      미래 fixture
- *   SK텔레콤        98,600원      110,000원   140,000원
- *   아모레퍼시픽    PER 44.13배   PER 55배    PER 63.0배
- *   삼성전자        257,000원     285,000원   300,000원
- *   카카오페이      47,350원      52,000원    55,000원
+ *   종목              실측            임계값        미래 fixture
+ *   SK텔레콤          98,600원        110,000원     140,000원       (08-28)
+ *   아모레퍼시픽      PER 44.13배     PER 55배      PER 63.0배      (08-28)
+ *   삼성전자          257,000원       285,000원     300,000원       (08-28)
+ *   삼성바이오로직스  1,466,000원     1,700,000원   1,800,000원     (09-07)
  */
 
 interface SeedPremiseVariant {
@@ -254,50 +254,50 @@ const SEED_D: SeedItem = {
   },
 };
 
-// 종목 E — 카카오페이. 보유중, 매수가 대비 이미 수익 구간이라 "좋은 소식"과
+// 종목 E — 삼성바이오로직스. 보유중, 매수가 대비 이미 수익 구간이라 "좋은 소식"과
 // 저평가 전제 유지가 함께 가는 무난한 케이스.
 const SEED_E: SeedItem = {
   id: "seed-e",
-  ticker: "377300",
+  ticker: "207940",
   status: "bought",
-  addedPrice: 37_000,
+  addedPrice: 1_280_000,
   addedAt: "2026-07-01T09:00:00+09:00",
-  avgBuyPrice: 38_200,
+  avgBuyPrice: 1_310_000,
   boughtAt: "2026-07-03T09:30:00+09:00",
   quote: {
-    current: { price: 46_300, changePercent: 0.4 },
-    future: { price: 55_000, changePercent: 18.8 },
+    current: { price: 1_466_000, changePercent: 1.3 },
+    future: { price: 1_800_000, changePercent: 22.8 },
   },
   thesis: {
     category: "undervalued",
     followup: [
       { questionId: "cheap-vs-what", selected: "peers" },
       { questionId: "metric", selected: "price-itself" },
-      { questionId: "target-price", selected: "custom", freeText: "52000" },
+      { questionId: "target-price", selected: "custom", freeText: "1700000" },
     ],
-    freeText: "간편결제 점유율이 계속 오르고 있고, 흑자전환 기대감도 있어서 매수했어요.",
+    freeText: "글로벌 제약사 CDMO 위탁 물량이 계속 늘고 있고, 5공장 가동으로 생산능력도 따라 붙는다고 봐서 매수했어요.",
     createdAt: "2026-07-01T09:04:00+09:00",
     critique: {
       isChallengeable: true,
-      challengeReason: "흑자전환 '기대감'이 실제 손익분기 시점 추정 없이 막연함",
+      challengeReason: "수주 증가를 근거로 들었으나, 이미 그 성장이 주가에 얼마나 반영됐는지는 짚지 않음",
       counterpoints: [
         {
-          point: "흑자전환 시점에 대한 구체적 근거(분기별 적자 축소 추이 등) 없이 기대감만 언급됨",
+          point: "수주잔고 증가는 공개된 정보라 현재 주가에 상당 부분 반영돼 있을 수 있고, PER 50배대라는 사실은 근거에 등장하지 않음",
           severity: "minor",
-          basis: "followup에 손익 관련 지표가 등장하지 않음",
+          basis: "followup에 밸류에이션 지표가 등장하지 않음",
         },
       ],
-      openQuestions: ["최근 분기 영업손실 규모가 줄어드는 추세인지 확인해보셨나요?"],
+      openQuestions: ["현재 밸류에이션이 이미 수주 성장분을 반영한 수준은 아닌지 확인해보셨나요?"],
     },
     premises: [
       {
         base: {
           id: "seed-e-p1",
-          statement: "5만 2,000원 이하일 때 저평가",
+          statement: "170만원 이하일 때 저평가",
           checkType: "price",
         },
-        current: { status: "intact", observedValue: "46,300원" },
-        future: { status: "broken", observedValue: "55,000원" },
+        current: { status: "intact", observedValue: "1,466,000원" },
+        future: { status: "broken", observedValue: "1,800,000원" },
       },
     ],
   },
