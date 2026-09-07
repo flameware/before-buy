@@ -1,7 +1,8 @@
 import { cn } from "@/lib/utils";
 
-// shadcn 기본값은 `bg-accent`지만 이 프로젝트의 `--accent`는 브랜드 옐로(CTA 색)라
-// skeleton이 강조 요소처럼 보인다. 중립 회색인 `--muted`를 쓴다.
+// shadcn 기본값은 `bg-accent`다. 라이트에서 `--accent`와 `--muted`는 같은 값이라
+// 지금은 어느 쪽을 써도 같지만, 다크에서만 갈라진다. `--muted`로 고정해 둔다 —
+// skeleton은 어떤 팔레트에서도 강조 요소가 아니다.
 
 function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (

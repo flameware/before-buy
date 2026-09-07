@@ -245,7 +245,7 @@ export function OrderConfirmContent({
               <button
                 type="button"
                 onClick={handleUpdateThesis}
-                className="text-left text-sm text-primary underline"
+                className="text-left text-sm text-foreground underline"
               >
                 생각이 바뀌셨나요?
               </button>

@@ -22,7 +22,9 @@ const buttonVariants = cva(
         // 흰 글자 대비가 넉넉하지 않아(구매 ≈4.0:1, 판매 ≈3.1:1) 라벨을 semibold로 올린다.
         buy: "bg-trade-buy font-semibold text-trade-buy-foreground hover:bg-trade-buy/90 focus-visible:ring-trade-buy/40",
         sell: "bg-trade-sell font-semibold text-trade-sell-foreground hover:bg-trade-sell/90 focus-visible:ring-trade-sell/40",
-        link: "text-primary underline-offset-4 hover:underline",
+        // shadcn 기본값은 `text-primary`지만 이 프로젝트의 `--primary`는 밝은 라임이라
+        // 흰 배경에서 1.54:1이다 — 텍스트로는 못 읽는다. `--primary` 옆 주석을 보라.
+        link: "text-foreground underline underline-offset-4 hover:no-underline",
       },
       size: {
         default:

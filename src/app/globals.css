@@ -60,22 +60,28 @@
 
 :root {
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.148 0.004 228.8);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.852 0.199 91.936);
-  --primary-foreground: oklch(0.421 0.095 57.708);
+  --popover-foreground: oklch(0.148 0.004 228.8);
+  /* 브랜드 라임. `bg-primary` + `text-primary-foreground`는 5.68:1로 멀쩡하지만
+     **흰 배경 위 `text-primary`는 1.54:1**이라 텍스트로는 쓸 수 없다 — 링크는
+     `text-foreground underline`으로 간다(`button.tsx`/`badge.tsx`의 `link` variant).
+     이 비대칭은 밝기 때문이지 실수가 아니다: 배경으로 쓰면 어두운 글자를 받고,
+     글자로 쓰면 받쳐줄 것이 없다. */
+  --primary: oklch(0.841 0.238 128.85);
+  --primary-foreground: oklch(0.405 0.101 131.063);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.852 0.199 91.936);
-  --accent-foreground: oklch(0.421 0.095 57.708);
+  --muted: oklch(0.963 0.002 197.1);
+  --muted-foreground: oklch(0.56 0.021 213.5);
+  --accent: oklch(0.963 0.002 197.1);
+  --accent-foreground: oklch(0.218 0.008 223.9);
   --destructive: oklch(0.577 0.245 27.325);
 
   /* 매매 방향(구매/판매)과 등락 방향(상승/하락)은 색이 같아도 **뜻이 다르다** — 값이 아니라
      이름으로 갈라둔다. 한 토큰에 묶으면 "구매 버튼만 톤 다운"이 등락률 색까지 조용히 끌고 간다.
-     `--primary`(앰버)는 매매와 무관한 진행 CTA 전담이라 여기 섞지 않는다.
+     `--primary`(라임)는 매매와 무관한 진행 CTA 전담이라 여기 섞지 않는다 — 초록 계열이지만
+     등락 신호가 아니다. 한국 관례대로 상승은 `--price-up`(빨강)이다.
      다크 모드는 이 프로토타입의 범위가 아니라 `.dark`에 대응 값을 두지 않는다 — 누락이 아니다. */
   --trade-buy: #ff112d;
   --trade-buy-foreground: #ffffff;
@@ -84,63 +90,67 @@
   /* Tailwind의 red-500 / blue-500 — 지금까지 화면에 하드코딩돼 있던 값 그대로다. */
   --price-up: oklch(63.7% 0.237 25.331);
   --price-down: oklch(62.3% 0.214 259.815);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.905 0.182 98.111);
-  --chart-2: oklch(0.795 0.184 86.047);
-  --chart-3: oklch(0.681 0.162 75.834);
-  --chart-4: oklch(0.554 0.135 66.442);
-  --chart-5: oklch(0.476 0.114 61.907);
+  --border: oklch(0.925 0.005 214.3);
+  --input: oklch(0.925 0.005 214.3);
+  --ring: oklch(0.723 0.014 214.4);
+  --chart-1: oklch(0.872 0.007 219.6);
+  --chart-2: oklch(0.56 0.021 213.5);
+  --chart-3: oklch(0.45 0.017 213.2);
+  --chart-4: oklch(0.378 0.015 216);
+  --chart-5: oklch(0.275 0.011 216.9);
   /* 전체 곡률 스케일의 단 하나뿐인 출처 — 위 `@theme inline`의 모든 층이 여기에 배수를 곱한다.
      shadcn 프리셋이 준 0.875rem(14px)은 서비스 전반이 지나치게 둥글게 읽혀 0.25rem로 낮췄다(#145).
      이 값을 만질 때 `CONTEXT.md`의 "액자는 그 안의 카드보다 덜 둥글다"(#125)가 함께 지켜지는지 본다 —
      액자는 `rounded-md`(0.8배), 카드는 `rounded-2xl`(1.8배)이라 배수가 유지되는 한 자동으로 참이다. */
   --radius: 0.25rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.681 0.162 75.834);
-  --sidebar-primary-foreground: oklch(0.987 0.026 102.212);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.987 0.002 197.1);
+  --sidebar-foreground: oklch(0.148 0.004 228.8);
+  --sidebar-primary: oklch(0.648 0.2 131.684);
+  --sidebar-primary-foreground: oklch(0.986 0.031 120.757);
+  --sidebar-accent: oklch(0.963 0.002 197.1);
+  --sidebar-accent-foreground: oklch(0.218 0.008 223.9);
+  --sidebar-border: oklch(0.925 0.005 214.3);
+  --sidebar-ring: oklch(0.723 0.014 214.4);
   --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --foreground: oklch(0.148 0.004 228.8);
 }
 
+/* **현재 도달 불가능하고 검증된 적 없다.** 이 프로젝트에는 테마 토글도, `dark` 클래스를
+   붙이는 코드도 없다(`layout.tsx`의 `<html>`을 보라). 팔레트를 바꿀 때 라이트와 함께
+   갈아끼워 "다크만 옛 색"이 되는 것을 막을 뿐, 이 값들이 화면에서 확인됐다는 뜻은 아니다.
+   다크 모드를 실제로 켜는 날 전부 다시 봐야 한다. */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.795 0.184 86.047);
-  --primary-foreground: oklch(0.421 0.095 57.708);
+  --background: oklch(0.148 0.004 228.8);
+  --foreground: oklch(0.987 0.002 197.1);
+  --card: oklch(0.218 0.008 223.9);
+  --card-foreground: oklch(0.987 0.002 197.1);
+  --popover: oklch(0.218 0.008 223.9);
+  --popover-foreground: oklch(0.987 0.002 197.1);
+  --primary: oklch(0.768 0.233 130.85);
+  --primary-foreground: oklch(0.405 0.101 131.063);
   --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.795 0.184 86.047);
-  --accent-foreground: oklch(0.421 0.095 57.708);
+  --muted: oklch(0.275 0.011 216.9);
+  --muted-foreground: oklch(0.723 0.014 214.4);
+  --accent: oklch(0.275 0.011 216.9);
+  --accent-foreground: oklch(0.987 0.002 197.1);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.905 0.182 98.111);
-  --chart-2: oklch(0.795 0.184 86.047);
-  --chart-3: oklch(0.681 0.162 75.834);
-  --chart-4: oklch(0.554 0.135 66.442);
-  --chart-5: oklch(0.476 0.114 61.907);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.795 0.184 86.047);
-  --sidebar-primary-foreground: oklch(0.987 0.026 102.212);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.56 0.021 213.5);
+  --chart-1: oklch(0.872 0.007 219.6);
+  --chart-2: oklch(0.56 0.021 213.5);
+  --chart-3: oklch(0.45 0.017 213.2);
+  --chart-4: oklch(0.378 0.015 216);
+  --chart-5: oklch(0.275 0.011 216.9);
+  --sidebar: oklch(0.218 0.008 223.9);
+  --sidebar-foreground: oklch(0.987 0.002 197.1);
+  --sidebar-primary: oklch(0.768 0.233 130.85);
+  --sidebar-primary-foreground: oklch(0.274 0.072 132.109);
+  --sidebar-accent: oklch(0.275 0.011 216.9);
+  --sidebar-accent-foreground: oklch(0.987 0.002 197.1);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.56 0.021 213.5);
 }
 
 @layer base {
