@@ -471,14 +471,14 @@ export function StockDetailView({ ticker, stockName }: { ticker: string; stockNa
         {openQuestions.length > 0 ? <OpenQuestionsSection questions={openQuestions} /> : null}
 
         {/* 근거 갱신은 **두 상태 모두** body 맨 아래에 둔다 — 관심종목과 보유중이 같은
-            골격을 갖게 하는 것이 이 배치의 목적이다(#105). 앰버라 body 안에서도 충분히
+            골격을 갖게 하는 것이 이 배치의 목적이다(#105). 브랜드색 버튼이라 body 안에서도 충분히
             눈에 띄므로 하단 바에 고정할 이유가 적고, 하단 바는 그만큼 비워 각 상태의
             고유한 행동(`관심종목에서 제외`·`판매`)에 내준다.
             근거가 없는 종목이면 라벨이 `근거 적기`가 되는데, 그때는 바로 위의 "아직 왜
             담았는지 적어두지 않았어요" 빈 카드가 이 버튼을 가리키게 된다. */}
         {/* 하단 바 버튼(48px 전체폭)과 크기를 맞추지 않는다 — 이 버튼은 body 안의 내용물이라
             같은 치수를 쓰면 바가 하나 더 있는 것처럼 읽힌다. 40px에 라벨 폭 + 좌우 패딩으로
-            줄이고, 강조는 앰버가 맡는다. `default`(36px)도 `lg`(48px)도 아닌 크기라
+            줄이고, 강조는 `--primary`가 맡는다. `default`(36px)도 `lg`(48px)도 아닌 크기라
             사이즈 토큰을 늘리는 대신 이 한 곳에서만 덮는다. */}
         <Button
           className="h-10 self-center px-5"
